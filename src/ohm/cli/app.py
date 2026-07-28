@@ -1,0 +1,525 @@
+"""OHM TUI Application - Main entry point.
+
+Enterprise-grade orchestrator and harness for LLMs.
+Provides a rich terminal UI for interacting with AI agents.
+"""
+
+import asyncio
+import json
+from typing import Any
+from pathlib import Path
+from datetime import datetime
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.containers import Horizontal, Vertical
+from textual.screen import ModalScreen
+from textual.widgets import Button, Static, Input
+from textual import on
+
+from ohm.cli.widgets.banner import Banner
+from ohm.cli.widgets.chat import ChatArea
+from ohm.cli.widgets.input import CommandInput
+from ohm.cli.widgets.sidebar import Sidebar
+from ohm.cli.widgets.status import StatusBar
+from ohm.cli.widgets.progress import ContextProgress
+from ohm.cli.widgets.modal_menu import ModalMenu
+from ohm.cli.widgets.file_includer import FileIncluder
+from ohm.cli.widgets.model_selector import ModelSelector
+from ohm.cli.themes.default import OHM_DEFAULT
+from ohm.cli.themes.light import OHM_LIGHT
+from ohm.cli.themes.ocean import OHM_OCEAN
+from ohm.cli.themes.gruvbox import OHM_GRUVBOX
+from ohm.core.agent import Agent, AgentConfig
+from ohm.core.commands import CommandRegistry
+from ohm.utils.fake_data import FAKE_COMMANDS
+
+
+# ──────────────────────────────────────────────────────────────
+# Session Recovery
+# ──────────────────────────────────────────────────────────────
+
+SESSION_DIR = Path.home() / ".ohm" / "sessions"
+SESSION_FILE = SESSION_DIR / "last_session.json"
+
+
+def save_session(state: dict) -> None:
+    """Save session state for recovery."""
+    SESSION_DIR.mkdir(parents=True, exist_ok=True)
+    state["saved_at"] = datetime.now().isoformat()
+    SESSION_FILE.write_text(json.dumps(state, indent=2))
+
+
+def load_session() -> dict | None:
+    """Load last session state if available."""
+    if SESSION_FILE.exists():
+        try:
+            return json.loads(SESSION_FILE.read_text())
+        except (json.JSONDecodeError, OSError):
+            return None
+    return None
+
+
+def clear_session() -> None:
+    """Clear saved session."""
+    if SESSION_FILE.exists():
+        SESSION_FILE.unlink()
+
+
+# ──────────────────────────────────────────────────────────────
+# Quit Confirmation Dialog
+# ──────────────────────────────────────────────────────────────
+
+class QuitConfirm(ModalScreen[bool]):
+    """Quit confirmation dialog."""
+
+    CSS = """
+    QuitConfirm {
+        align: center middle;
+    }
+    #quit-dialog {
+        width: 50;
+        height: auto;
+        max-height: 12;
+        background: $surface;
+        border: thick $primary;
+        padding: 2 4;
+        align: center middle;
+    }
+    #quit-title {
+        text-align: center;
+        width: 100%;
+        text-style: bold;
+        margin-bottom: 1;
+        color: $warning;
+    }
+    #quit-message {
+        text-align: center;
+        width: 100%;
+        margin-bottom: 1;
+    }
+    #quit-buttons {
+        width: 100%;
+        align: center middle;
+        height: auto;
+    }
+    Button {
+        margin: 0 2;
+        min-width: 12;
+    }
+    """
+
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel"),
+        Binding("y", "confirm", "Yes"),
+        Binding("n", "cancel", "No"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="quit-dialog"):
+            yield Static("Quit OHM?", id="quit-title")
+            yield Static("Session will be saved automatically.", id="quit-message")
+            with Horizontal(id="quit-buttons"):
+                yield Button("Yes, Quit", variant="error", id="quit-yes")
+                yield Button("Cancel", variant="primary", id="quit-cancel")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "quit-yes":
+            self.dismiss(True)
+        else:
+            self.dismiss(False)
+
+    def action_confirm(self) -> None:
+        self.dismiss(True)
+
+    def action_cancel(self) -> None:
+        self.dismiss(False)
+
+
+# ──────────────────────────────────────────────────────────────
+# OHM Application
+# ──────────────────────────────────────────────────────────────
+
+class OhmApp(App[None]):
+    """OHM TUI Application."""
+
+    TITLE = "OHM"
+    SUB_TITLE = "Orchestration & Harness for Models"
+
+    CSS = """
+    Screen {
+        layout: vertical;
+    }
+    #main-container {
+        height: 1fr;
+        width: 100%;
+        layout: horizontal;
+    }
+    #chat-column {
+        width: 1fr;
+        height: 100%;
+    }
+    #chat-area {
+        width: 1fr;
+        height: 1fr;
+    }
+    #sidebar {
+        width: 35;
+        height: 100%;
+        display: block;
+    }
+    #main-container.sidebar-hidden #sidebar {
+        display: none;
+    }
+    #command-dropdown {
+        width: 100%;
+        height: auto;
+        max-height: 12;
+        background: $surface;
+        border-top: solid $panel;
+        padding: 0 2;
+        display: none;
+        overflow-y: auto;
+    }
+    #modal-wrap {
+        dock: bottom;
+        height: auto;
+        width: 100%;
+        align: center middle;
+        layer: modal;
+        margin-bottom: 1;
+    }
+    #model-selector-wrap {
+        dock: bottom;
+        height: auto;
+        width: 100%;
+        align: center middle;
+        layer: modal;
+        margin-bottom: 1;
+    }
+    #file-includer-wrap {
+        dock: bottom;
+        height: auto;
+        width: 100%;
+        align: center middle;
+        layer: modal;
+        margin-bottom: 1;
+    }
+    """
+
+    BINDINGS = [
+        Binding("ctrl+q", "quit_ohm", "Quit", show=True, priority=True),
+        Binding("ctrl+l", "clear", "Clear", show=True, priority=True),
+        Binding("ctrl+k", "command_palette", "Commands", show=True, priority=True),
+        Binding("ctrl+s", "toggle_sidebar", "Sidebar", show=True, priority=True),
+        Binding("ctrl+d", "toggle_theme", "Theme", show=True, priority=True),
+        Binding("ctrl+o", "settings", "Settings", show=True, priority=True),
+        Binding("f2", "model_selector", "Model", show=True, priority=True),
+    ]
+
+    THEMES = {
+        "default": OHM_DEFAULT,
+        "light": OHM_LIGHT,
+        "ocean": OHM_OCEAN,
+        "gruvbox": OHM_GRUVBOX,
+    }
+
+    def __init__(self) -> None:
+        super().__init__()
+        from ohm.core.config import get_config
+        self.config = get_config()
+        self.current_theme_name = self.config.theme or "default"
+        self._dropdown_open = False
+
+        # Current provider/model state
+        self.current_provider = self.config.provider
+        self.current_model = self.config.model
+        self.current_model_name = self.config.model
+
+        for theme in self.THEMES.values():
+            self.register_theme(theme)
+
+        theme_map = {
+            "default": "ohm-dark",
+            "light": "ohm-light",
+            "ocean": "ohm-ocean",
+            "gruvbox": "ohm-gruvbox",
+        }
+        self.theme = theme_map.get(self.current_theme_name, "ohm-dark")
+
+        self.agent = Agent(AgentConfig(
+            provider=self.config.provider,
+            model=self.config.model,
+            max_tokens=self.config.max_tokens,
+            temperature=self.config.temperature,
+            sandbox=self.config.sandbox,
+            tools=self.config.tools,
+            system_prompt=self.config.system_prompt or AgentConfig.system_prompt,
+        ))
+        self.commands = CommandRegistry()
+
+        self._session_data: dict = {
+            "messages": [],
+            "started_at": datetime.now().isoformat(),
+            "theme": self.current_theme_name,
+        }
+
+    def compose(self) -> ComposeResult:
+        """Compose the application layout."""
+        with Horizontal(id="main-container"):
+            with Vertical(id="chat-column"):
+                yield ChatArea(id="chat-area")
+                yield ContextProgress()
+                yield Static(id="command-dropdown")
+                yield CommandInput()
+            yield Sidebar(id="sidebar")
+        yield StatusBar()
+        with Horizontal(id="modal-wrap"):
+            yield ModalMenu(id="modal-menu")
+        with Horizontal(id="file-includer-wrap"):
+            yield FileIncluder(id="file-includer")
+        with Horizontal(id="model-selector-wrap"):
+            yield ModelSelector(id="model-selector")
+
+    def on_mount(self) -> None:
+        """Called when app is mounted. Try to restore session."""
+        saved = load_session()
+        if saved:
+            self.notify(
+                f"Session restored from {saved.get('saved_at', 'unknown')}",
+                severity="info",
+                timeout=3,
+            )
+
+    def on_unmount(self) -> None:
+        """Called when app unmounts. Save session for recovery."""
+        self._session_data["theme"] = self.current_theme_name
+        self._session_data["ended_at"] = datetime.now().isoformat()
+        save_session(self._session_data)
+
+    # ── Hotkey Actions ──────────────────────────────────────
+
+    def action_quit_ohm(self) -> None:
+        """Show quit confirmation dialog."""
+        def on_confirm(confirmed: bool | None) -> None:
+            if confirmed:
+                self._session_data["theme"] = self.current_theme_name
+                self._session_data["ended_at"] = datetime.now().isoformat()
+                save_session(self._session_data)
+                self.exit()
+        self.push_screen(QuitConfirm(), on_confirm)
+
+    def action_clear(self) -> None:
+        """Clear the chat area."""
+        try:
+            self.query_one("ChatArea").clear()
+        except Exception as exc:
+            self.notify(f"Clear failed: {exc}", severity="warning")
+
+    def action_toggle_sidebar(self) -> None:
+        """Toggle the sidebar visibility."""
+        try:
+            container = self.query_one("#main-container")
+            container.toggle_class("sidebar-hidden")
+        except Exception as exc:
+            self.notify(f"Sidebar toggle failed: {exc}", severity="warning")
+
+    def action_toggle_theme(self) -> None:
+        """Cycle through themes."""
+        themes = list(self.THEMES.keys())
+        idx = themes.index(self.current_theme_name)
+        self.current_theme_name = themes[(idx + 1) % len(themes)]
+
+        theme_map = {
+            "default": "ohm-dark",
+            "light": "ohm-light",
+            "ocean": "ohm-ocean",
+            "gruvbox": "ohm-gruvbox",
+        }
+        self.theme = theme_map[self.current_theme_name]
+        
+        # Persist theme selection globally
+        try:
+            from ohm.core.config import get_config, save_global_config
+            cfg = get_config()
+            cfg.theme = self.current_theme_name
+            save_global_config(cfg)
+        except Exception as exc:
+            self.notify(f"Failed to save theme: {exc}", severity="warning")
+
+        self.notify(f"Theme: {self.current_theme_name}", severity="info")
+
+    def action_command_palette(self) -> None:
+        """Open/close the command palette modal."""
+        modal = self.query_one("#modal-menu")
+        if modal.is_shown:
+            modal.hide()
+            try:
+                self.query_one("Input").focus()
+            except Exception as exc:
+                self.notify(f"Focus return failed: {exc}", severity="warning")
+        else:
+            modal.show()
+
+    def action_settings(self) -> None:
+        """Open settings modal."""
+        from ohm.cli.screens.settings import SettingsModal
+        self.push_screen(SettingsModal())
+
+    def action_model_selector(self) -> None:
+        """Open/close the model selector."""
+        selector = self.query_one("#model-selector")
+        if selector.is_shown:
+            selector.hide()
+            try:
+                self.query_one("Input").focus()
+            except Exception as exc:
+                self.notify(f"Focus return failed: {exc}", severity="warning")
+        else:
+            selector.show()
+
+    def _on_model_selected(self, provider: dict, model: dict) -> None:
+        """Called when a model is selected from the ModelSelector."""
+        self.current_provider = provider["name"]
+        self.current_model = model["id"]
+        self.current_model_name = model["name"]
+
+        try:
+            self.query_one("Sidebar").refresh()
+            self.query_one("StatusBar").refresh()
+        except Exception as exc:
+            self.notify(f"Refresh failed: {exc}", severity="warning")
+
+        self.notify(
+            f"Model: {provider['display_name']} / {model['name']}",
+            severity="info",
+        )
+
+    # ── Slash command handling ──────────────────────────────
+
+    @on(Input.Changed, "#command-input")
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Handle input changes for / command filtering."""
+        text = event.value.strip()
+        dropdown = self.query_one("#command-dropdown", expect_type=Static)
+
+        if text.startswith("/") and len(text) >= 1:
+            query = text[1:].lower()
+            matches = [
+                cmd for cmd in FAKE_COMMANDS
+                if query in cmd["name"].lower() or query in cmd["description"].lower()
+            ]
+            if matches:
+                lines = []
+                for cmd in matches:
+                    hotkey = f" ({cmd['hotkey']})" if cmd.get("hotkey") else ""
+                    lines.append(f" [bold cyan]{cmd['name']}[/] {cmd['description']}{hotkey}")
+                dropdown.update("\n".join(lines))
+                dropdown.styles.display = "block"
+                self._dropdown_open = True
+                return
+
+        dropdown.styles.display = "none"
+        self._dropdown_open = False
+
+    @on(Input.Submitted, "#command-input")
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Handle input submission."""
+        text = event.value.strip()
+        chat = self.query_one("ChatArea")
+
+        if text.startswith("/"):
+            cmd_name = text.split()[0] if text else ""
+            matches = [c for c in FAKE_COMMANDS if c["name"] == cmd_name]
+            if matches:
+                chat.add_message("system", f"Command executed: {matches[0]['name']}")
+            else:
+                chat.add_message("system", f"Unknown command: {cmd_name}")
+        elif text:
+            chat.add_message("user", text)
+            thinking_widget = chat.start_thinking()
+            self.run_worker(
+                self._stream_agent_response(text, thinking_widget),
+                exclusive=False,
+            )
+
+        event.input.value = ""
+
+        try:
+            dropdown = self.query_one("#command-dropdown")
+            dropdown.styles.display = "none"
+            self._dropdown_open = False
+        except Exception as exc:
+            self.notify(f"Dropdown close failed: {exc}", severity="warning")
+
+    async def _stream_agent_response(self, prompt: str, thinking_widget: Any) -> None:
+        """Stream response from agent in background worker."""
+        # Yield to event loop so UI renders user message + thinking widget immediately
+        await asyncio.sleep(0)
+        chat = self.query_one("ChatArea")
+        agent_msg = None
+        full_response = ""
+
+        try:
+            # Check if agent has API key configured
+            provider = self.current_provider
+            api_key = self.config.api_key_for(provider)
+
+            if provider != "ollama" and not api_key:
+                thinking_widget.is_active = False
+                chat.add_message(
+                    "system",
+                    f"Warning: No API key configured for '{provider}'. "
+                    f"Set {provider.upper()}_API_KEY in .env or run 'ohm config' to change provider."
+                )
+                chat.add_message(
+                    "agent",
+                    f"I'm ready to help! However, I need an API key for **{provider.capitalize()}** to generate responses. "
+                    f"Please add your API key to `.env` or switch to Ollama (local) with `F2`."
+                )
+                return
+
+            # Stream response
+            async for event in self.agent.stream(prompt):
+                if isinstance(event, dict):
+                    # Handle thinking/reasoning steps vs text content
+                    event_type = event.get("type", "")
+                    if event_type == "reasoning" or "thought" in event:
+                        thought = event.get("thought", event.get("content", ""))
+                        thinking_widget.thought_text += str(thought)
+                    elif "data" in event or "text" in event or "content" in event:
+                        chunk = event.get("data") or event.get("text") or event.get("content") or ""
+                        if chunk:
+                            if thinking_widget.is_active:
+                                thinking_widget.is_active = False
+                            if agent_msg is None:
+                                agent_msg = chat.add_message("agent", "")
+                            full_response += str(chunk)
+                            agent_msg.update_content(full_response)
+                elif isinstance(event, str):
+                    if thinking_widget.is_active:
+                        thinking_widget.is_active = False
+                    if agent_msg is None:
+                        agent_msg = chat.add_message("agent", "")
+                    full_response += event
+                    agent_msg.update_content(full_response)
+
+            if thinking_widget.is_active:
+                thinking_widget.is_active = False
+
+            if not full_response and agent_msg is None:
+                chat.add_message("agent", "Response received from agent.")
+
+        except Exception as exc:
+            thinking_widget.is_active = False
+            chat.add_message("system", f"Agent error: {exc}")
+            self.notify(f"Agent error: {exc}", severity="error")
+
+
+def main() -> None:
+    """Run the OHM TUI."""
+    app = OhmApp()
+    app.run()
+
+
+if __name__ == "__main__":
+    main()
