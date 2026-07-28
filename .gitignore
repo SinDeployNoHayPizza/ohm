@@ -14,10 +14,3 @@ wheels/
 
 # OHM project config (user-specific)
 .ohm/
-
-# IDE / editor / agent configs
-.agents/
-.atl/
-.claude/
-.gga
-.windsurf/
