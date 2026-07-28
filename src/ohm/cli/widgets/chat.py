@@ -16,7 +16,7 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Static
 
-from ohm.utils.fake_data import OHM_LOGO_SMALL
+from ohm.utils.fake_data import OHM_LOGO_SMALL, get_random_logo
 from ohm import __version__
 
 
@@ -63,9 +63,12 @@ class MessageWidget(Static):
 
         if self.role == "welcome":
             self.add_class("msg-welcome")
-            logo = f"[bold cyan]{OHM_LOGO_SMALL}[/]\n"
-            version_info = f"[dim]v{__version__} | Orchestration & Harness for Models[/]\n\nType your command or prompt below. Press [bold cyan]F2[/] to change models."
-            self.update(logo + version_info)
+            logo = Text.from_ansi(get_random_logo())
+            logo.append(f"\nv{__version__} | Orchestration & Harness for Models\n\n", style="dim")
+            logo.append("Type your command or prompt below. Press ", style="")
+            logo.append("F2", style="bold cyan")
+            logo.append(" to change models.", style="")
+            self.update(logo)
         elif self.role == "user":
             self.add_class("msg-user")
             self.update(Text.assemble(

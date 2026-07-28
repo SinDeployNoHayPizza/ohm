@@ -394,6 +394,91 @@ OHM_LOGO_SMALL = """
      Orchestration & Harness for Models
 """
 
+# ─── ANSI color logo variants ─────────────────────────────────
+# Render with: Text.from_ansi(OHM_LOGO_VARIANTS[name]) (Rich)
+# Pick one randomly via get_random_logo()
+
+import random as _random
+
+_LOGO_COMMON = (
+    "\x1b[0;90;1;40m░░▒▓▓██▓▓▒░░\x1b[0;37;40m "
+    "\x1b[0;90;1;40m█▓▓▒▒▌\x1b[0;37;40m "
+    "\x1b[0;90;1;40m█▓▓▒▒\x1b[0;37;40m "
+    "\x1b[0;90;1;40m█▓▓▒▒▌▓░\x1b[0;37;40m "
+    "\x1b[0;90;1;40m█▓▓▒▒\x1b[0m\n"
+    "\x1b[0;37;40m \x1b[0;90;1;40m░▒▓▓██▓▓▒░\x1b[0;37;40m  "
+    "\x1b[0;90;1;40m█▓▓▒▒▌\x1b[0;37;40m "
+    "\x1b[0;90;1;40m█▓▓▒▒\x1b[0;37;40m "
+    "\x1b[0;90;1;40m█▓▓▒▒▌▐\x1b[0;37;40m  "
+    "\x1b[0;90;1;40m█▓▓▒▒\x1b[0m"
+)
+
+_LOGO_LINE1 = "\x1b[0;37;40m ▄▀▀▀▀▀▀▀▀▄  █▀▀▀█  █▀▀▀█ █▀▀▀█    █▀▀▀█\x1b[0m\n"
+
+def _make_variant(border, fg, bg, bright):
+    """Build an ANSI logo variant from color numbers."""
+    return (
+        _LOGO_LINE1 +
+        f"\x1b[{border}m░\x1b[0;{fg};40m░░░\x1b[0;37;40m▄▄▄\x1b[0;{fg};40m░░░░\x1b[{border}m░\x1b[0;37;40m "
+        f"\x1b[{border}m░\x1b[0;{fg};40m░░░\x1b[{border}m░\x1b[0;37;40m  "
+        f"\x1b[{border}m░\x1b[0;{fg};40m░░░\x1b[{border}m░\x1b[0;37;40m "
+        f"\x1b[{border}m░\x1b[0;{fg};40m░░░\x1b[0;37;{bg}m▐\x1b[0;37;40m▌  ▐\x1b[0;37;{bg}m▌\x1b[0;{fg};40m░░░\x1b[{border}m░\x1b[0m\n"
+        f"\x1b[{border}m▒\x1b[0;{fg};40m▒▒▒\x1b[{border}m▒\x1b[0;90;1;40m▓▓\x1b[{border}m▒\x1b[0;{fg};40m▒▒▒\x1b[{border}m▒\x1b[0;37;40m "
+        f"\x1b[{border}m▒\x1b[0;{fg};40m▒▒▒\x1b[{border}m▒\x1b[0;37;40m  "
+        f"\x1b[{border}m▒\x1b[0;{fg};40m▒▒▒\x1b[{border}m▒\x1b[0;37;40m "
+        f"\x1b[{border}m▒\x1b[0;{fg};40m▒▒▒▒\x1b[{border}m▒\x1b[0;37;40m  "
+        f"\x1b[{border}m▒\x1b[0;{fg};40m▒▒▒▒\x1b[{border}m▒\x1b[0m\n"
+        f"\x1b[{border}m▓\x1b[0;{fg};40m▓▓▓\x1b[{border}m▓\x1b[0;90;1;40m▒▒\x1b[{border}m▓\x1b[0;{fg};40m▓▓▓\x1b[{border}m▓\x1b[0;37;40m "
+        f"\x1b[{border}m▓\x1b[0;{fg};40m▓▓▓\x1b[{border}m▓\x1b[0;37;40m  "
+        f"\x1b[{border}m▓\x1b[0;{fg};40m▓▓▓\x1b[{border}m▓\x1b[0;37;40m "
+        f"\x1b[{border}m▓\x1b[0;{fg};40m▓▓▓▓\x1b[0;{bright};1;{bg}m▐\x1b[0;97;1;40m▌▐\x1b[0;{bright};1;{bg}m▌\x1b[0;{fg};40m▓▓▓▓\x1b[{border}m▓\x1b[0m\n"
+        f"\x1b[{border}m█\x1b[0;{fg};40m███\x1b[{border}m█\x1b[0;37;40m  "
+        f"\x1b[{border}m█\x1b[0;{fg};40m███\x1b[{border}m█\x1b[0;37;40m "
+        f"\x1b[{border}m█\x1b[0;{fg};40m███\x1b[0;{bright};1;{bg}m▀▀▀▀\x1b[0;{fg};40m███\x1b[{border}m█\x1b[0;37;40m "
+        f"\x1b[{border}m█\x1b[0;{fg};40m█████\x1b[{border}m██\x1b[0;{fg};40m█████\x1b[{border}m█\x1b[0m\n"
+        f"\x1b[0;97;1;40m█\x1b[0;{bright};1;{bg}m░░░\x1b[0;97;1;40m█\x1b[0;37;40m  "
+        f"\x1b[0;97;1;{bg}m█\x1b[0;{bright};1;{bg}m░░░\x1b[0;97;1;{bg}m█\x1b[0;37;40m "
+        f"\x1b[0;97;1;40m█\x1b[0;{bright};1;{bg}m░░░\x1b[0;97;1;{bg}m▄▄▄▄\x1b[0;{bright};1;{bg}m░░░\x1b[0;97;1;40m█\x1b[0;37;40m "
+        f"\x1b[0;97;1;{bg}m█\x1b[0;{bright};1;{bg}m░░░\x1b[0;97;1;{bg}m▄\x1b[0;{bright};1;{bg}m░\x1b[0;97;1;{bg}m▀▀\x1b[0;{bright};1;{bg}m░\x1b[0;97;1;{bg}m▄\x1b[0;{bright};1;{bg}m░░░\x1b[0;97;1;{bg}m█\x1b[0m\n"
+        f"\x1b[0;90;1;47m▓\x1b[0;{bright};1;{bg}m▒▒▒\x1b[0;90;1;47m▓\x1b[0;37;40m  "
+        f"\x1b[0;90;1;47m▓\x1b[0;{bright};1;{bg}m▒▒▒\x1b[0;90;1;47m▓\x1b[0;37;40m "
+        f"\x1b[0;90;1;47m▓\x1b[0;{bright};1;{bg}m▒▒▒\x1b[0;90;1;47m▓\x1b[0;90;1;40m▓▓\x1b[0;90;1;47m▓\x1b[0;{bright};1;{bg}m▒▒▒\x1b[0;90;1;47m▓\x1b[0;37;40m "
+        f"\x1b[0;90;1;47m▓\x1b[0;{bright};1;{bg}m▒▒▒\x1b[0;90;1;47m▓▒\x1b[0;{bright};1;{bg}m▒▒\x1b[0;90;1;47m▒▓\x1b[0;{bright};1;{bg}m▒▒▒\x1b[0;90;1;47m▓\x1b[0m\n"
+        f"\x1b[0;90;1;47m▒\x1b[0;{bright};1;{bg}m▓▓▓\x1b[0;90;1;47m▒\x1b[0;90;1;40m▄▄\x1b[0;90;1;47m▒\x1b[0;{bright};1;{bg}m▓▓▓\x1b[0;90;1;47m▒\x1b[0;37;40m "
+        f"\x1b[0;90;1;47m▒\x1b[0;{bright};1;{bg}m▓▓▓\x1b[0;90;1;47m▒\x1b[0;90;1;40m▓▓\x1b[0;90;1;47m▒\x1b[0;{bright};1;{bg}m▓▓▓\x1b[0;90;1;47m▒\x1b[0;37;40m "
+        f"\x1b[0;90;1;47m▒\x1b[0;{bright};1;{bg}m▓▓▓\x1b[0;90;1;47m▒▌\x1b[0;{bright};1;47m▐▌\x1b[0;90;1;47m▐▒\x1b[0;{bright};1;{bg}m▓▓▓\x1b[0;90;1;47m▒\x1b[0m\n"
+        f"\x1b[0;90;1;47m░\x1b[0;{bright};1;{bg}m███\x1b[0;{bright};1;40m█\x1b[0;{bright};1;47m▄▄\x1b[0;{bright};1;{bg}m████\x1b[0;90;1;47m░\x1b[0;37;40m "
+        f"\x1b[0;90;1;47m░\x1b[0;{bright};1;{bg}m███\x1b[0;90;1;47m░\x1b[0;90;1;40m▌\x1b[0;37;40m "
+        f"\x1b[0;90;1;47m░\x1b[0;{bright};1;{bg}m███\x1b[0;90;1;47m░\x1b[0;37;40m "
+        f"\x1b[0;90;1;47m░\x1b[0;{bright};1;{bg}m███\x1b[0;90;1;47m░\x1b[0;90;1;40m▓\x1b[0;90;1;47m░░\x1b[0;90;1;40m▒\x1b[0;90;1;47m░\x1b[0;{bright};1;{bg}m███\x1b[0;90;1;47m░\x1b[0m\n"
+        f"\x1b[0;90;1;40m░\x1b[0;90;1;47m▄\x1b[0;37;{bg}m▄▄▄▄▄▄▄▄\x1b[0;90;1;47m▄\x1b[0;90;1;40m░\x1b[0;37;40m "
+        f"█\x1b[0;37;{bg}m▄▄▄\x1b[0;37;40m█\x1b[0;90;1;40m▌\x1b[0;37;40m "
+        f"█\x1b[0;37;{bg}m▄▄▄\x1b[0;37;40m█ "
+        f"█\x1b[0;37;{bg}m▄▄▄\x1b[0;37;40m█\x1b[0;90;1;40m▓\x1b[0;90;1;47m▌▐\x1b[0;90;1;40m░\x1b[0;37;40m█\x1b[0;37;{bg}m▄▄▄\x1b[0;37;40m█\x1b[0m\n"
+        + _LOGO_COMMON
+    )
+
+# Variant definitions: (border_code, fg_num, bg_num, bright_num)
+_LOGO_VARIANT_DEFS = {
+    "blue":        ("0;97;1;47", 32, 42, 92),
+    "cyan":        ("0;97;1;47", 33, 43, 93),
+    "green":       ("0;97;1;47", 32, 42, 92),
+    "purple":      ("0;97;1;47", 35, 45, 95),
+    "red":         ("0;96;1;47", 34, 44, 94),
+    "silver":      ("0;97;1;47", 37, 47, 97),
+}
+
+OHM_LOGO_VARIANTS: dict[str, str] = {
+    name: _make_variant(*params)
+    for name, params in _LOGO_VARIANT_DEFS.items()
+}
+
+OHM_LOGO_ANSI = OHM_LOGO_VARIANTS["blue"]  # default
+
+def get_random_logo() -> str:
+    """Return a random ANSI logo variant."""
+    return _random.choice(list(OHM_LOGO_VARIANTS.values()))
+
 
 # ──────────────────────────────────────────────────────────────
 # Status Data
