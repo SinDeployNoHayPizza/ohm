@@ -32,37 +32,7 @@ from ohm.cli.themes.gruvbox import OHM_GRUVBOX
 from ohm.core.agent import Agent, AgentConfig
 from ohm.core.commands import CommandRegistry
 from ohm.utils.fake_data import FAKE_COMMANDS, FAKE_PROVIDERS
-
-
-# ──────────────────────────────────────────────────────────────
-# Session Recovery
-# ──────────────────────────────────────────────────────────────
-
-SESSION_DIR = Path.home() / ".ohm" / "sessions"
-SESSION_FILE = SESSION_DIR / "last_session.json"
-
-
-def save_session(state: dict) -> None:
-    """Save session state for recovery."""
-    SESSION_DIR.mkdir(parents=True, exist_ok=True)
-    state["saved_at"] = datetime.now().isoformat()
-    SESSION_FILE.write_text(json.dumps(state, indent=2))
-
-
-def load_session() -> dict | None:
-    """Load last session state if available."""
-    if SESSION_FILE.exists():
-        try:
-            return json.loads(SESSION_FILE.read_text())
-        except (json.JSONDecodeError, OSError):
-            return None
-    return None
-
-
-def clear_session() -> None:
-    """Clear saved session."""
-    if SESSION_FILE.exists():
-        SESSION_FILE.unlink()
+from ohm.commands.session import _gen_session_id, _save_session, _load_last_session
 
 
 # ──────────────────────────────────────────────────────────────
@@ -214,6 +184,7 @@ class OhmApp(App[None]):
         Binding("ctrl+d", "toggle_theme", "Theme", show=True, priority=True),
         Binding("ctrl+o", "settings", "Settings", show=True, priority=True),
         Binding("f2", "model_selector", "Model", show=True, priority=True),
+        Binding("f3", "session_browser", "Sessions", show=True, priority=True),
     ]
 
     THEMES = {
@@ -223,7 +194,7 @@ class OhmApp(App[None]):
         "gruvbox": OHM_GRUVBOX,
     }
 
-    def __init__(self) -> None:
+    def __init__(self, continue_session: dict | None = None) -> None:
         super().__init__()
         from ohm.core.config import get_config
         self.config = get_config()
@@ -261,11 +232,15 @@ class OhmApp(App[None]):
         self.commands = CommandRegistry()
 
         self._total_tokens_used = 0
+        self._continue_session = continue_session
 
         self._session_data: dict = {
+            "session_id": _gen_session_id(),
             "messages": [],
             "started_at": datetime.now().isoformat(),
             "theme": self.current_theme_name,
+            "provider": self.current_provider,
+            "model": self.current_model,
         }
 
     def compose(self) -> ComposeResult:
@@ -286,14 +261,35 @@ class OhmApp(App[None]):
             yield ModelSelector(id="model-selector")
 
     def on_mount(self) -> None:
-        """Called when app is mounted. Try to restore session."""
-        saved = load_session()
-        if saved:
-            self.notify(
-                f"Session restored from {saved.get('saved_at', 'unknown')}",
-                severity="info",
-                timeout=3,
-            )
+        """Called when app is mounted. Replay continue session or restore."""
+        if self._continue_session:
+            msgs = self._continue_session.get("messages", [])
+            if msgs:
+                chat = self.query_one(ChatArea)
+                scroll = chat.query_one("#chat-scroll")
+                scroll.remove_children()
+                for m in msgs:
+                    chat.add_message(m["role"], m["content"])
+                # Preserve loaded messages so they aren't lost on save
+                self._session_data["messages"] = list(msgs)
+                last_ts = self._continue_session.get("ended_at") or self._continue_session.get("started_at", "unknown")
+                self.notify(
+                    f"Resumed session ({len(msgs)} messages, ended {last_ts})",
+                    severity="info",
+                    timeout=4,
+                )
+            # Restore session metadata
+            saved_id = self._continue_session.get("session_id")
+            if saved_id:
+                self._session_data["session_id"] = saved_id
+        else:
+            saved = _load_last_session()
+            if saved:
+                self.notify(
+                    "Previous session available. Press F3 to browse or use ohm -c to resume.",
+                    severity="info",
+                    timeout=5,
+                )
 
         # Set initial context window from config model
         try:
@@ -308,7 +304,8 @@ class OhmApp(App[None]):
         """Called when app unmounts. Save session for recovery."""
         self._session_data["theme"] = self.current_theme_name
         self._session_data["ended_at"] = datetime.now().isoformat()
-        save_session(self._session_data)
+        self._session_data["total_tokens"] = self._total_tokens_used
+        _save_session(self._session_data)
 
     # ── Hotkey Actions ──────────────────────────────────────
 
@@ -318,7 +315,8 @@ class OhmApp(App[None]):
             if confirmed:
                 self._session_data["theme"] = self.current_theme_name
                 self._session_data["ended_at"] = datetime.now().isoformat()
-                save_session(self._session_data)
+                self._session_data["total_tokens"] = self._total_tokens_used
+                _save_session(self._session_data)
                 self.exit()
         self.push_screen(QuitConfirm(), on_confirm)
 
@@ -378,6 +376,107 @@ class OhmApp(App[None]):
         """Open settings modal."""
         from ohm.cli.screens.settings import SettingsModal
         self.push_screen(SettingsModal())
+
+    def action_session_browser(self) -> None:
+        """Open the session browser modal."""
+        from ohm.cli.screens.session_browser import SessionBrowser
+        def on_select(result: dict | None) -> None:
+            if result is not None:
+                # Replay and continue from selected session
+                chat = self.query_one(ChatArea)
+                scroll = chat.query_one("#chat-scroll")
+                scroll.remove_children()
+                msgs = result.get("messages", [])
+                for m in msgs:
+                    chat.add_message(m["role"], m["content"])
+                # Preserve loaded messages so they aren't lost on save
+                self._session_data["messages"] = list(msgs)
+                saved_id = result.get("session_id")
+                if saved_id:
+                    self._session_data["session_id"] = saved_id
+                    self._session_data["started_at"] = result.get("started_at", self._session_data["started_at"])
+                    self._session_data["theme"] = result.get("theme", self._session_data["theme"])
+                self.notify(
+                    f"Loaded session ({len(msgs)} messages)",
+                    severity="info",
+                    timeout=3,
+                )
+        self.push_screen(SessionBrowser(), on_select)
+
+    def action_session_continue(self) -> None:
+        """Resume the last session from within the TUI."""
+        from ohm.commands.session import _load_last_session
+        data = _load_last_session()
+        if not data:
+            self.notify("No previous session found.", severity="warning", timeout=3)
+            return
+        # Replay messages like action_session_browser does
+        chat = self.query_one(ChatArea)
+        scroll = chat.query_one("#chat-scroll")
+        scroll.remove_children()
+        msgs = data.get("messages", [])
+        for m in msgs:
+            chat.add_message(m["role"], m["content"])
+        # Preserve loaded messages so they aren't lost on save
+        self._session_data["messages"] = list(msgs)
+        saved_id = data.get("session_id")
+        if saved_id:
+            self._session_data["session_id"] = saved_id
+            self._session_data["started_at"] = data.get("started_at", self._session_data["started_at"])
+            self._session_data["theme"] = data.get("theme", self._session_data["theme"])
+        self.notify(
+            f"Resumed session ({len(msgs)} messages)",
+            severity="info",
+            timeout=3,
+        )
+
+    def action_session_clear(self) -> None:
+        """Delete all sessions with confirmation."""
+        from ohm.commands.session import _list_session_files
+        import shutil
+        from pathlib import Path
+        from ohm.core.config import SESSIONS_DIR
+        files = _list_session_files()
+        if not files:
+            self.notify("No sessions to delete.", severity="info", timeout=2)
+            return
+        count = len(files)
+        # Use push_screen with a simple confirmation
+        from textual.screen import ModalScreen
+        from textual.widgets import Static, Button
+        from textual.containers import Horizontal, Vertical
+
+        class ConfirmClear(ModalScreen[bool]):
+            CSS = """
+            ConfirmClear { align: center middle; }
+            #dialog { width: 50; height: auto; padding: 2 4; background: $surface; border: thick $error; }
+            #title { text-align: center; text-style: bold; margin-bottom: 1; }
+            #buttons { align: center middle; }
+            Button { margin: 0 2; min-width: 12; }
+            """
+            BINDINGS = [Binding("escape", "cancel", "Cancel"), Binding("y", "confirm", "Yes")]
+
+            def compose(self):
+                with Vertical(id="dialog"):
+                    yield Static(f"Delete ALL {count} session(s)?", id="title")
+                    yield Static(f"This removes {count} saved conversation(s) permanently.", id="message")
+                    with Horizontal(id="buttons"):
+                        yield Button("Yes, Delete All", variant="error", id="confirm-yes")
+                        yield Button("Cancel", variant="primary", id="confirm-cancel")
+
+            def on_button_pressed(self, event: Button.Pressed):
+                self.dismiss(event.button.id == "confirm-yes")
+
+            def action_confirm(self): self.dismiss(True)
+            def action_cancel(self): self.dismiss(False)
+
+        def on_confirm(confirmed: bool | None):
+            if confirmed:
+                import shutil
+                for f in files:
+                    f.unlink()
+                self.notify(f"Deleted {count} session(s)", severity="info", timeout=3)
+        self.push_screen(ConfirmClear(), on_confirm)
 
     def action_model_selector(self) -> None:
         """Open/close the model selector."""
@@ -459,13 +558,30 @@ class OhmApp(App[None]):
 
         if text.startswith("/"):
             cmd_name = text.split()[0] if text else ""
-            matches = [c for c in FAKE_COMMANDS if c["name"] == cmd_name]
-            if matches:
-                chat.add_message("system", f"Command executed: {matches[0]['name']}")
+            # Check for multi-word commands first (/session list, /session continue)
+            full_cmd = text.strip().lower()
+            cmd_entry = next(
+                (c for c in FAKE_COMMANDS if c["name"] == full_cmd),
+                next((c for c in FAKE_COMMANDS if c["name"] == cmd_name), None),
+            )
+            if cmd_entry:
+                key = cmd_entry.get("key")
+                if key:
+                    action_name = f"action_{key}"
+                    action = getattr(self, action_name, None)
+                    if action:
+                        action()
+                        return
+                chat.add_message("system", f"Command executed: {cmd_entry['name']}")
             else:
                 chat.add_message("system", f"Unknown command: {cmd_name}")
         elif text:
             chat.add_message("user", text)
+            self._session_data["messages"].append({
+                "role": "user",
+                "content": text,
+                "timestamp": datetime.now().isoformat(),
+            })
             thinking_widget = chat.start_thinking()
             self.run_worker(
                 self._stream_agent_response(text, thinking_widget),
@@ -594,6 +710,14 @@ class OhmApp(App[None]):
                 self.log(f"[stream] WARNING: no text received, showing fallback message")
                 chat.add_message("agent", "Response received from agent.")
 
+            # Capture agent response
+            if full_response:
+                self._session_data["messages"].append({
+                    "role": "agent",
+                    "content": full_response,
+                    "timestamp": datetime.now().isoformat(),
+                })
+
             # Accumulate tokens and update progress bar
             metrics = self.agent.last_metrics
             if metrics:
@@ -610,7 +734,16 @@ class OhmApp(App[None]):
 
         except asyncio.CancelledError:
             thinking_widget.is_active = False
-            self.log("[stream] CANCELLED (app shutting down)")
+            # Capture whatever partial response we received before cancellation
+            if full_response:
+                self._session_data["messages"].append({
+                    "role": "agent",
+                    "content": full_response + "\n\n_[Response interrupted — session ended]_",
+                    "timestamp": datetime.now().isoformat(),
+                })
+                self.log(f"[stream] CANCELLED — captured partial response ({len(full_response)}c)")
+            else:
+                self.log("[stream] CANCELLED (app shutting down)")
         except asyncio.TimeoutError:
             thinking_widget.is_active = False
             chat.add_message("system", "Agent response timed out after 120s.")
@@ -618,14 +751,23 @@ class OhmApp(App[None]):
             self.log("[stream] TIMEOUT after 120s")
         except Exception as exc:
             thinking_widget.is_active = False
-            chat.add_message("system", f"Agent error: {exc}")
-            self.notify(f"Agent error: {exc}", severity="error")
-            self.log(f"[stream] ERROR: {exc}")
+            # Capture partial response if any
+            if full_response:
+                self._session_data["messages"].append({
+                    "role": "agent",
+                    "content": full_response + f"\n\n_[Error: {exc}]_",
+                    "timestamp": datetime.now().isoformat(),
+                })
+                self.log(f"[stream] ERROR — captured partial response ({len(full_response)}c): {exc}")
+            else:
+                chat.add_message("system", f"Agent error: {exc}")
+                self.notify(f"Agent error: {exc}", severity="error")
+                self.log(f"[stream] ERROR: {exc}")
 
 
-def main() -> None:
+def main(continue_session: dict | None = None) -> None:
     """Run the OHM TUI."""
-    app = OhmApp()
+    app = OhmApp(continue_session=continue_session)
     app.run()
 
 

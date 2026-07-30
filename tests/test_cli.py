@@ -105,3 +105,66 @@ class TestCommands:
     def test_goal_command_imports(self):
         from ohm.commands.goal import register, handler
         assert callable(handler)
+
+    def test_session_continue_handler_imports(self):
+        from ohm.commands.session import handle_continue
+        assert callable(handle_continue)
+
+
+class TestContinueFlag:
+    """Task 3: --continue/-c global flag."""
+
+    def test_continue_flag_registered(self):
+        """Global --continue flag parses correctly."""
+        reg = Registry()
+        reg.register_global(
+            "--continue", "-c", dest="continue_",
+            action="store_true", default=False,
+            help="Resume the last session",
+        )
+        result = reg.parse(["--continue"])
+        assert result.namespace.continue_ is True
+
+    def test_continue_short_flag(self):
+        """Short -c flag also sets continue_. """
+        reg = Registry()
+        reg.register_global(
+            "--continue", "-c", dest="continue_",
+            action="store_true", default=False,
+        )
+        result = reg.parse(["-c"])
+        assert result.namespace.continue_ is True
+
+    def test_continue_defaults_false(self):
+        """No flag means continue_ is False."""
+        reg = Registry()
+        reg.register_global(
+            "--continue", "-c", dest="continue_",
+            action="store_true", default=False,
+        )
+        result = reg.parse([])
+        assert result.namespace.continue_ is False
+
+
+class TestSessionSubcommand:
+    """Task 5: session continue sub-action."""
+
+    def test_session_continue_subcommand_registered(self):
+        """Verify the session command can route 'continue'."""
+        from ohm.commands.session import register, register_args, handler
+        reg = Registry()
+        register(reg)
+        # Build temp parser to check sub-actions
+        import argparse
+        p = argparse.ArgumentParser(prog="ohm session", add_help=False)
+        register_args(p)
+        ns = p.parse_args(["continue"])
+        assert ns.action == "continue"
+
+    def test_session_handler_returns_int(self):
+        """handler() always returns an int exit code."""
+        from ohm.commands.session import handler
+        import argparse
+        ns = argparse.Namespace(action="list", limit=10)
+        code = handler(ns)
+        assert isinstance(code, int)

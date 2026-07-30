@@ -173,4 +173,12 @@ class ModalMenu(Widget):
         except Exception as exc:
             self.app.notify(f"Focus return failed: {exc}", severity="warning")
         if cmd:
+            key = cmd.get("key")
+            if key:
+                # Dispatch to a named action on the app
+                action_name = f"action_{key}"
+                action = getattr(self.app, action_name, None)
+                if action:
+                    action()
+                    return
             self.app.notify(f"Command: {cmd['name']}", severity="info")

@@ -157,6 +157,8 @@ FAKE_TOKEN_USAGE = {
 # Commands
 # ──────────────────────────────────────────────────────────────
 
+# Commands shared by both / dropdown and Ctrl+K palette.
+# Entries with a "key" field map to a real OhmApp action; others are display-only.
 FAKE_COMMANDS = [
     {"name": "/run", "description": "Execute a prompt", "category": "core", "hotkey": "Ctrl+Enter"},
     {"name": "/fix", "description": "Fix a specific file or issue", "category": "core", "hotkey": "Ctrl+F"},
@@ -174,6 +176,11 @@ FAKE_COMMANDS = [
     {"name": "/history", "description": "Show command history", "category": "info", "hotkey": "Ctrl+H"},
     {"name": "/theme", "description": "Change theme", "category": "ui", "hotkey": None},
     {"name": "/exit", "description": "Exit OHM", "category": "system", "hotkey": "Ctrl+Q"},
+    # ── Real session commands (wired to OhmApp actions) ──
+    {"name": "/sessions", "description": "Browse saved sessions", "category": "session", "hotkey": "F3", "key": "session_browser"},
+    {"name": "/session list", "description": "List saved sessions", "category": "session", "hotkey": "F3", "key": "session_browser"},
+    {"name": "/session continue", "description": "Resume the last session", "category": "session", "hotkey": None, "key": "session_continue"},
+    {"name": "/session clear", "description": "Delete all sessions", "category": "session", "hotkey": None, "key": "session_clear"},
 ]
 
 # ──────────────────────────────────────────────────────────────

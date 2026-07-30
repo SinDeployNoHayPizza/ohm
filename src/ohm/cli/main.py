@@ -21,6 +21,16 @@ def main(argv: list[str] | None = None) -> int:
         Exit code following Unix conventions (0 = success).
     """
     registry = Registry()
+
+    # Global flags
+    registry.register_global(
+        "--continue", "-c",
+        dest="continue_",
+        action="store_true",
+        default=False,
+        help="Resume the last session",
+    )
+
     register_all(registry)
     result = registry.parse(argv)
     return registry.dispatch(result)

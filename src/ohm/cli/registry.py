@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from ohm import __version__
+from ohm.utils.fake_data import OHM_LOGO
 
 
 # ── Exit codes ────────────────────────────────────────────────
@@ -244,7 +245,8 @@ class Registry:
                 print("Run 'ohm --help' for usage.", file=sys.stderr)
                 return EXIT_USAGE_ERROR
             # No subcommand → launch TUI
-            return self._launch_tui()
+            continue_mode = getattr(ns, "continue_", False)
+            return self._launch_tui(continue_mode=continue_mode)
 
         entry = self._subcommands.get(subcommand)
         if entry is None:
@@ -282,13 +284,31 @@ class Registry:
 
     # ── Helpers ───────────────────────────────────────────
 
-    def _launch_tui(self) -> int:
-        """Launch the TUI application."""
+    def _launch_tui(self, continue_mode: bool = False) -> int:
+        """Launch the TUI application.
+
+        Args:
+            continue_mode: When True, load the last saved session and
+                pass it to OhmApp so the user can resume.
+        """
         try:
             from ohm.cli.app import OhmApp
 
-            app = OhmApp()
+            session_data = None
+            if continue_mode:
+                from ohm.commands.session import _load_last_session
+                session_data = _load_last_session()
+                if not session_data:
+                    print("No previous session to continue.")
+                    print("Starting a fresh session.")
+
+            app = OhmApp(continue_session=session_data)
             app.run()
+
+            # Exit banner
+            print(OHM_LOGO)
+            print("Continue last session:  ohm -c")
+            print("Session browser:        ohm session list")
             return EXIT_SUCCESS
         except Exception as exc:  # noqa: BLE001
             print(f"Failed to launch TUI: {exc}", file=sys.stderr)
@@ -304,6 +324,7 @@ class Registry:
             "Options:",
             "  -h, --help, -?    Show this help message and exit",
             "  --version, -V     Show version and exit",
+            "  -c, --continue    Resume the last session",
             "",
             "Commands:",
         ]

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import secrets
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -39,6 +40,13 @@ def register_args(parser: argparse._ActionsContainer) -> None:
         help="Skip confirmation"
     )
 
+    # continue
+    cont_p = sub.add_parser("continue", help="Resume the last session")
+    cont_p.add_argument(
+        "--fresh", "-f", action="store_true", default=False,
+        help="Start fresh even if a saved session exists"
+    )
+
 
 def register(registry) -> None:
     """Register the ``session`` subcommand with the CLI registry."""
@@ -50,16 +58,19 @@ def register(registry) -> None:
     )
 
 
-def _get_sessions_dir() -> Path:
+def _get_sessions_dir(session_dir: Path | None = None) -> Path:
     """Get the sessions directory path."""
+    if session_dir is not None:
+        session_dir.mkdir(parents=True, exist_ok=True)
+        return session_dir
     from ohm.core.config import SESSIONS_DIR
     SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
     return SESSIONS_DIR
 
 
-def _list_session_files() -> list[Path]:
+def _list_session_files(session_dir: Path | None = None) -> list[Path]:
     """List all session JSON files, sorted by modification time (newest first)."""
-    sessions_dir = _get_sessions_dir()
+    sessions_dir = _get_sessions_dir(session_dir)
     files = list(sessions_dir.glob("*.json"))
     # Filter out the special last_session.json
     files = [f for f in files if f.name != "last_session.json"]
@@ -71,7 +82,7 @@ def _load_session(path: Path) -> dict:
     """Load a session JSON file."""
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
         return {}
 
 
@@ -86,6 +97,95 @@ def _format_time(iso_str: str | None) -> str:
         return iso_str
 
 
+# ── Helpers for session persistence (used by app.py, registry.py) ──
+
+
+def _gen_session_id() -> str:
+    """Generate a sortable, unique session ID.
+
+    Format: ``ses_{ISO8601-no-punct}_{4-hex}``
+    Example: ``ses_20260729_221530_a1b2``
+    """
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    suffix = secrets.token_hex(2)
+    return f"ses_{ts}_{suffix}"
+
+
+def _save_session(
+    data: dict,
+    session_dir: Path | None = None,
+) -> None:
+    """Save session data to ``{session_id}.json`` and update pointer.
+
+    Args:
+        data: Session data dict with at least ``session_id`` key.
+        session_dir: Directory to write into (defaults to SESSIONS_DIR).
+    """
+    if session_dir is None:
+        from ohm.core.config import SESSIONS_DIR
+        session_dir = SESSIONS_DIR
+    session_dir.mkdir(parents=True, exist_ok=True)
+
+    session_id = data.get("session_id") or _gen_session_id()
+    data["session_id"] = session_id
+
+    session_file = session_dir / f"{session_id}.json"
+    session_file.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    pointer_file = session_dir / "last_session.json"
+    pointer_file.write_text(
+        json.dumps({"last_session_id": session_id}, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _load_last_session(session_dir: Path | None = None) -> dict | None:
+    """Load the last saved session via pointer resolution.
+
+    Reads ``last_session.json`` → resolves ``{session_id}.json`` →
+    returns its content.  Returns ``None`` when no session exists or
+    data is corrupt.
+    """
+    if session_dir is None:
+        from ohm.core.config import SESSIONS_DIR
+        session_dir = SESSIONS_DIR
+
+    pointer_file = session_dir / "last_session.json"
+    if not pointer_file.exists():
+        return None
+
+    try:
+        pointer = json.loads(pointer_file.read_text(encoding="utf-8"))
+        session_id = pointer.get("last_session_id")
+        if not session_id:
+            return None
+        session_file = session_dir / f"{session_id}.json"
+        if not session_file.exists():
+            return None
+        return json.loads(session_file.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def handle_continue(args: argparse.Namespace) -> int:
+    """Resume the last session via TUI.
+
+    Exit code 1 when no session exists.
+    """
+    session_data = _load_last_session()
+    if not session_data:
+        print("[session] No previous session to continue.")
+        return 1
+
+    from ohm.cli.app import OhmApp
+    app = OhmApp(continue_session=session_data)
+    app.run()
+    return 0
+
+
 def handler(args: argparse.Namespace) -> int:
     """Execute the ``session`` command."""
     action = getattr(args, "action", None) or "list"
@@ -98,6 +198,8 @@ def handler(args: argparse.Namespace) -> int:
         return _handle_delete(args)
     elif action == "clear":
         return _handle_clear(args)
+    elif action == "continue":
+        return handle_continue(args)
     else:
         return _handle_list(args)
 
