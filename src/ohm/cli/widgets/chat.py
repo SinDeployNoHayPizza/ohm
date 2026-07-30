@@ -8,6 +8,7 @@ from typing import Any
 
 from rich.markdown import Markdown
 from rich.panel import Panel
+from rich.spinner import Spinner
 from rich.text import Text
 from rich.syntax import Syntax
 from textual.app import ComposeResult
@@ -123,10 +124,26 @@ class ThinkingWidget(Static):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.start_time = datetime.now()
+        self._spinner = Spinner("dots")
 
     def compose(self) -> ComposeResult:
-        yield Static("• Thinking...", classes="title", id="thinking-title")
+        yield Static("⠋", classes="title", id="thinking-title")
         yield Static("", classes="thought-content", id="thinking-text")
+
+    def on_mount(self) -> None:
+        """Start spinner animation."""
+        self.set_interval(1 / 10, self._tick_spinner)
+
+    def _tick_spinner(self) -> None:
+        """Advance spinner frame while active."""
+        if not self.is_active:
+            return
+        elapsed = (datetime.now() - self.start_time).total_seconds()
+        try:
+            title = self.query_one("#thinking-title", Static)
+            title.update(self._spinner.render(elapsed))
+        except Exception:
+            pass
 
     def watch_thought_text(self, text: str) -> None:
         """Update thought text when changed."""

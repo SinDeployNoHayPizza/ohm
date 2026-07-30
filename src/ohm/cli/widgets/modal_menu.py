@@ -155,7 +155,7 @@ class ModalMenu(Widget):
     def action_close(self) -> None:
         self.hide()
         try:
-            self.app.query_one("Input").focus()
+            self.app.query_one("#command-input").focus()
         except Exception as exc:
             self.app.notify(f"Focus return failed: {exc}", severity="warning")
 
@@ -169,7 +169,7 @@ class ModalMenu(Widget):
         cmd = self.get_selected()
         self.hide()
         try:
-            self.app.query_one("Input").focus()
+            self.app.query_one("#command-input").focus()
         except Exception as exc:
             self.app.notify(f"Focus return failed: {exc}", severity="warning")
         if cmd:

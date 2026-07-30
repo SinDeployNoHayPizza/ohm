@@ -3,9 +3,6 @@
 from textual.widget import Widget
 from textual.reactive import reactive
 from textual.app import RenderResult
-from rich.text import Text
-
-from ohm.utils.fake_data import FAKE_TOKEN_USAGE
 
 
 class ContextProgress(Widget):
@@ -19,24 +16,26 @@ class ContextProgress(Widget):
     }
     """
 
-    percentage: reactive[float] = reactive(0.0)
+    tokens_used: reactive[int] = reactive(0)
+    context_window: reactive[int] = reactive(200_000)
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        tokens = FAKE_TOKEN_USAGE
-        self.percentage = (tokens["total_tokens"] / tokens["max_tokens"]) * 100
+    def update(self, tokens_used: int, context_window: int) -> None:
+        """Update the progress bar with real token usage data."""
+        self.tokens_used = tokens_used
+        self.context_window = context_window
 
     def render(self) -> RenderResult:
         """Render the progress bar."""
         width = 30
-        filled = int(width * self.percentage / 100)
+        pct = (self.tokens_used / self.context_window * 100) if self.context_window > 0 else 0.0
+        filled = int(width * pct / 100)
         empty = width - filled
 
         # Color based on usage
-        if self.percentage > 80:
+        if pct > 80:
             color = "bold red"
             status = "HIGH"
-        elif self.percentage > 60:
+        elif pct > 60:
             color = "bold yellow"
             status = "MODERATE"
         else:
@@ -45,6 +44,5 @@ class ContextProgress(Widget):
 
         bar = f"[{color}]{'█' * filled}[/][dim]{'░' * empty}[/]"
 
-        tokens = FAKE_TOKEN_USAGE
-        return f"""[bold]Context[/] {bar} [bold]{self.percentage:.1f}%[/]
-[dim]{tokens['total_tokens']:,} / {tokens['max_tokens']:,} tokens │ {status}[/]"""
+        return f"""[bold]Context[/] {bar} [bold]{pct:.1f}%[/]
+[dim]{self.tokens_used:,} / {self.context_window:,} tokens │ {status}[/]"""

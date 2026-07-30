@@ -1,15 +1,25 @@
-"""OHM Sidebar Widget - Provider/model info, token usage, and progress."""
+"""OHM Sidebar Widget - Provider/model info, token usage, and real-time status."""
 
 from __future__ import annotations
 
 from textual.widget import Widget
 from textual.app import RenderResult
 
-from ohm.utils.fake_data import FAKE_PROVIDERS, FAKE_STATUS, FAKE_TOKEN_USAGE
+# ── Provider display name resolution ──────────────────────────
+
+_PROVIDER_DISPLAY: dict[str, str] = {
+    "anthropic": "Anthropic",
+    "openai": "OpenAI",
+    "google": "Google Gemini",
+    "nvidia": "NVIDIA NIM",
+    "ollama": "Ollama",
+    "ollama-cloud": "Ollama Cloud",
+    "local": "Local (Ollama)",
+}
 
 
 class Sidebar(Widget):
-    """Right sidebar displaying real or placeholder model configuration and token usage."""
+    """Right sidebar displaying real-time provider, model, token usage, and agent status."""
 
     DEFAULT_CSS = """
     Sidebar {
@@ -22,96 +32,57 @@ class Sidebar(Widget):
     """
 
     def render(self) -> RenderResult:
-        """Render the sidebar content."""
-        app = self.app
-        
-        # Extract active values from app configuration or current state
-        provider_name = getattr(app, "current_provider", "?")
-        model_id = getattr(app, "current_model", "?")
-        model_name = getattr(app, "current_model_name", "?")
+        """Render the sidebar with real data from app and agent state."""
 
-        # Fallbacks for token usage
-        # Attempt to get real token usage from agent state or fallback to - / ?
-        agent_stats = getattr(app, "agent", None)
-        
-        input_tokens = "-"
-        output_tokens = "-"
-        total_tokens = "-"
-        max_tokens = "-"
-        cost_usd = "-"
-        session_cost_usd = "-"
-        context_pct = 0.0
-        context_desc = "unknown window"
+        # ── Provider & model ────────────────────────────────────
+        provider_name = getattr(self.app, "current_provider", "?")
+        model_name = getattr(self.app, "current_model_name", "?")
+        display_name = _PROVIDER_DISPLAY.get(provider_name, provider_name.capitalize())
 
-        # Check if we have some real info from fake data matching, or agent itself
-        matched_provider = None
-        matched_model = None
-        for p in FAKE_PROVIDERS:
-            if p["name"] == provider_name:
-                matched_provider = p
-                for m in p["models"]:
-                    if m["id"] == model_id:
-                        matched_model = m
-                        break
-                break
+        # Check API key status
+        config = getattr(self.app, "config", None)
+        api_key = config.api_key_for(provider_name) if config else None
+        status_icon = "✓" if api_key else "✗"
 
-        if matched_model:
-            context_desc = f"{matched_model['context_window'] // 1000}k window"
-            max_tokens = matched_model['context_window']
-        elif provider_name != "?":
-            context_desc = "?"
-        
-        # If we have run some prompts, we can show usage. Otherwise we default to - or ?
-        # For the demo, let's show fake usage if any messages are present, or real zero if empty
-        try:
-            chat_area = app.query_one("ChatArea")
-            has_messages = len(getattr(chat_area, "messages", [])) > 0 or True
-        except Exception:
-            has_messages = False
+        # ── Context window ──────────────────────────────────────
+        context_window = getattr(self.app, "_current_context_window", 0)
+        context_desc = f"{context_window // 1000}k window" if context_window else "?"
 
-        if has_messages:
-            # Let's pull stats securely or fallback
-            tokens = FAKE_TOKEN_USAGE
-            input_tokens = f"{tokens['input_tokens']:,}"
-            output_tokens = f"{tokens['output_tokens']:,}"
-            total_tokens = f"{tokens['total_tokens']:,}"
-            
-            if matched_model:
-                max_tok_val = matched_model['context_window']
-                max_tokens = f"{max_tok_val:,}"
-                context_pct = (tokens["total_tokens"] / max_tok_val) * 100
-            else:
-                max_tokens = "?"
-                context_pct = 0.0
+        # ── Token & cost (real data) ────────────────────────────
+        total_tokens = getattr(self.app, "_total_tokens_used", 0)
 
-            cost_usd = f"${tokens['cost_usd']:.3f}"
-            session_cost_usd = f"${tokens['session_cost_usd']:.3f}"
+        agent = getattr(self.app, "agent", None)
+        agent_state = agent.state if agent else None
+
+        if agent_state:
+            total_cost = agent_state.total_cost_usd
+            tasks_done = agent_state.tasks_completed
+            tasks_failed = agent_state.tasks_failed
+            is_running = agent_state.is_running
         else:
-            input_tokens = "0"
-            output_tokens = "0"
-            total_tokens = "0"
-            cost_usd = "$0.000"
-            session_cost_usd = "$0.000"
+            total_cost = 0.0
+            tasks_done = 0
+            tasks_failed = 0
+            is_running = False
 
+        # Context usage percentage
+        context_pct = (total_tokens / context_window * 100) if context_window > 0 else 0.0
         progress_bar = self._make_progress_bar(context_pct)
 
-        # Status fields
-        status = FAKE_STATUS
-        sandbox_status = status.get("sandbox_status", "?")
-        sandbox_mode = status.get("sandbox_mode", "?")
-        mcp_status = status.get("mcp_status", "?")
-        memory_usage = status.get("memory_usage", "?")
-        completed_tasks = status.get("completed_tasks", "?")
-        failed_tasks = status.get("failed_tasks", "?")
-        active_skills = status.get("active_skills", [])
+        # ── Formatting ─────────────────────────────────────────
+        tokens_str = f"{total_tokens:,}" if total_tokens else "0"
+        max_tokens_str = f"{context_window:,}" if context_window else "?"
+        cost_str = f"${total_cost:.4f}" if total_cost else "$0.0000"
 
-        provider_status = "healthy" if matched_provider else "?"
-        status_icon = "*" if provider_status == "healthy" else "?"
+        # ── Agent config status ─────────────────────────────────
+        sandbox_enabled = agent.config.sandbox if agent and agent.config else False
+        sandbox_status = "enabled" if sandbox_enabled else "disabled"
+        tools = agent.config.tools if agent and agent.config else []
 
-        p_display = matched_provider["display_name"] if matched_provider else provider_name.capitalize()
+        running_tag = "[green]active[/]" if is_running else "[dim]idle[/]"
 
         return f"""[bold]Provider[/]
-[cyan]{p_display}[/] {status_icon}
+[cyan]{display_name}[/] {status_icon}
 
 [bold]Model[/]
 [dim]{model_name}[/]
@@ -120,24 +91,21 @@ class Sidebar(Widget):
 [dim]  {context_desc}[/]
 
 [bold]Tokens[/]
-Input:  [cyan]{input_tokens}[/]
-Output: [cyan]{output_tokens}[/]
-Total:  [cyan]{total_tokens}[/] / {max_tokens}
+Total:  [cyan]{tokens_str}[/] / {max_tokens_str}
 
 [bold]Cost[/]
-[cyan]{cost_usd}[/] (session: [cyan]{session_cost_usd}[/])
+[cyan]{cost_str}[/]
 
 [bold]Context Usage[/]
 {progress_bar} [cyan]{context_pct:.1f}%[/]
 
 [bold]Status[/]
-Sandbox: [green]{sandbox_status}[/] ({sandbox_mode})
-MCP:     [green]{mcp_status}[/]
-Memory:  [cyan]{memory_usage}[/]
-Tasks:   [cyan]{completed_tasks}[/] done, [red]{failed_tasks}[/] failed
+Sandbox: [green]{sandbox_status}[/]
+Agent:   {running_tag}
+Tasks:   [cyan]{tasks_done}[/] done, [red]{tasks_failed}[/] failed
 
-[bold]Active Skills[/]
-{self._format_skills(active_skills)}
+[bold]Tools ({len(tools)})[/]
+{self._format_tools(tools)}
 """
 
     def _make_progress_bar(self, percentage: float, width: int = 20) -> str:
@@ -155,8 +123,8 @@ Tasks:   [cyan]{completed_tasks}[/] done, [red]{failed_tasks}[/] failed
         bar = f"[{color}]{'█' * filled}[/][dim]{'░' * empty}[/]"
         return bar
 
-    def _format_skills(self, skills: list[str]) -> str:
-        """Format skills list."""
-        if not skills:
-            return "  [dim]None[/]"
-        return "\n".join(f"  * [cyan]{s}[/]" for s in skills)
+    def _format_tools(self, tools: list[str]) -> str:
+        """Format tools list."""
+        if not tools:
+            return "  [dim]none[/]"
+        return "\n".join(f"  * [cyan]{s}[/]" for s in tools)

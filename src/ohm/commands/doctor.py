@@ -83,7 +83,7 @@ def _check_env() -> tuple[str, str]:
             keys_found.append(provider)
 
     # Also check os.environ
-    for var in ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY"]:
+    for var in ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY"]:
         if os.environ.get(var):
             provider = var.replace("_API_KEY", "").lower()
             if provider not in keys_found:

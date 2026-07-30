@@ -179,7 +179,7 @@ class ModelSelector(Widget):
         """Close the selector."""
         self.hide()
         try:
-            self.app.query_one("Input").focus()
+            self.app.query_one("#command-input").focus()
         except Exception as exc:
             self.app.notify(f"Focus return failed: {exc}", severity="warning")
 
@@ -228,6 +228,6 @@ class ModelSelector(Widget):
         self.app._on_model_selected(provider, model)
         self.hide()
         try:
-            self.app.query_one("Input").focus()
+            self.app.query_one("#command-input").focus()
         except Exception as exc:
             self.app.notify(f"Focus return failed: {exc}", severity="warning")

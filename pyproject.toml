@@ -10,7 +10,6 @@ dependencies = [
     "pydantic-ai>=2.18.0",
     "pydantic-evals>=2.18.0",
     "pydantic-graph>=2.18.0",
-    "strands-agent-tools>=0.0.1",
     "strands-agents>=1.50.1",
     "strands-agents-tools>=0.8.5",
     "textual>=0.80.0",

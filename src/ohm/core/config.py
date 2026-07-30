@@ -66,7 +66,7 @@ _ENV_MAP: dict[str, str] = {
 _API_KEY_ENV: dict[str, list[str]] = {
     "anthropic": ["ANTHROPIC_API_KEY"],
     "openai": ["OPENAI_API_KEY"],
-    "gemini": ["GOOGLE_API_KEY", "GEMINI_API_KEY"],
+    "gemini": ["GEMINI_API_KEY"],
     "bedrock": ["AWS_ACCESS_KEY_ID"],
     "ollama": [],  # no key needed
 }

@@ -14,3 +14,7 @@ wheels/
 
 # OHM project config (user-specific)
 .ohm/
+
+# Runtime log files
+stderr.txt
+stdout.txt

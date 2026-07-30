@@ -106,7 +106,7 @@ def _resolve_model(provider: str, model_id: str | None) -> Any:
     elif provider_key == "gemini":
         # https://strandsagents.com/docs/user-guide/concepts/model-providers/google/
         # GeminiModel(client_args={"api_key": ...}, model_id=..., params=...)
-        api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+        api_key = os.environ.get("GEMINI_API_KEY")
         if api_key:
             kwargs["client_args"] = {"api_key": api_key}
         if resolved_model:
@@ -186,6 +186,7 @@ class AgentState:
     total_cost_usd: float = 0.0
     tasks_completed: int = 0
     tasks_failed: int = 0
+    last_metrics: dict = field(default_factory=dict)
 
 
 # ── Main agent class ──────────────────────────────────────────
@@ -260,6 +261,7 @@ class Agent:
 
             content = self._extract_text(result)
             metrics = self._extract_metrics(result)
+            self.state.last_metrics = metrics
 
             self.state.is_running = False
             self.state.current_task = None
@@ -299,6 +301,13 @@ class Agent:
         finally:
             self.state.is_running = False
             self.state.current_task = None
+            # Capture metrics from strands agent internals after stream completion
+            try:
+                last_result = getattr(agent, '_last_result', None)
+                if last_result is not None:
+                    self.state.last_metrics = self._extract_metrics(last_result)
+            except Exception:
+                self.state.last_metrics = {}
 
     @staticmethod
     def _extract_text(result: Any) -> str:
@@ -336,6 +345,11 @@ class Agent:
             }
         except Exception:
             return {}
+
+    @property
+    def last_metrics(self) -> dict:
+        """Usage metrics captured from the last run() or stream() execution."""
+        return self.state.last_metrics
 
     def get_status(self) -> dict[str, Any]:
         """Get current agent status."""

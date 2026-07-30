@@ -13,7 +13,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Static, Input
+from textual.widgets import Button, Static, TextArea
 from textual import on
 
 from ohm.cli.widgets.banner import Banner
@@ -31,7 +31,7 @@ from ohm.cli.themes.ocean import OHM_OCEAN
 from ohm.cli.themes.gruvbox import OHM_GRUVBOX
 from ohm.core.agent import Agent, AgentConfig
 from ohm.core.commands import CommandRegistry
-from ohm.utils.fake_data import FAKE_COMMANDS
+from ohm.utils.fake_data import FAKE_COMMANDS, FAKE_PROVIDERS
 
 
 # ──────────────────────────────────────────────────────────────
@@ -234,6 +234,9 @@ class OhmApp(App[None]):
         self.current_provider = self.config.provider
         self.current_model = self.config.model
         self.current_model_name = self.config.model
+        self._current_context_window = self._resolve_context_window(
+            self.current_provider, self.current_model
+        )
 
         for theme in self.THEMES.values():
             self.register_theme(theme)
@@ -256,6 +259,8 @@ class OhmApp(App[None]):
             system_prompt=self.config.system_prompt or AgentConfig.system_prompt,
         ))
         self.commands = CommandRegistry()
+
+        self._total_tokens_used = 0
 
         self._session_data: dict = {
             "messages": [],
@@ -289,6 +294,15 @@ class OhmApp(App[None]):
                 severity="info",
                 timeout=3,
             )
+
+        # Set initial context window from config model
+        try:
+            self.query_one(ContextProgress).update(
+                tokens_used=0,
+                context_window=self._current_context_window,
+            )
+        except Exception:
+            pass
 
     def on_unmount(self) -> None:
         """Called when app unmounts. Save session for recovery."""
@@ -354,7 +368,7 @@ class OhmApp(App[None]):
         if modal.is_shown:
             modal.hide()
             try:
-                self.query_one("Input").focus()
+                self.query_one("#command-input").focus()
             except Exception as exc:
                 self.notify(f"Focus return failed: {exc}", severity="warning")
         else:
@@ -371,17 +385,35 @@ class OhmApp(App[None]):
         if selector.is_shown:
             selector.hide()
             try:
-                self.query_one("Input").focus()
+                self.query_one("#command-input").focus()
             except Exception as exc:
                 self.notify(f"Focus return failed: {exc}", severity="warning")
         else:
             selector.show()
+
+    def _resolve_context_window(self, provider_name: str, model_id: str) -> int:
+        """Look up context_window for a given provider/model ID."""
+        for p in FAKE_PROVIDERS:
+            if p["name"] == provider_name:
+                for m in p["models"]:
+                    if m["id"] == model_id:
+                        return m.get("context_window", 200000)
+        return 200000
 
     def _on_model_selected(self, provider: dict, model: dict) -> None:
         """Called when a model is selected from the ModelSelector."""
         self.current_provider = provider["name"]
         self.current_model = model["id"]
         self.current_model_name = model["name"]
+        self._current_context_window = model.get("context_window", 200000)
+
+        try:
+            self.query_one(ContextProgress).update(
+                tokens_used=0,
+                context_window=self._current_context_window,
+            )
+        except Exception:
+            pass
 
         try:
             self.query_one("Sidebar").refresh()
@@ -396,10 +428,10 @@ class OhmApp(App[None]):
 
     # ── Slash command handling ──────────────────────────────
 
-    @on(Input.Changed, "#command-input")
-    def on_input_changed(self, event: Input.Changed) -> None:
+    @on(TextArea.Changed, "#command-input")
+    def on_input_changed(self, event: TextArea.Changed) -> None:
         """Handle input changes for / command filtering."""
-        text = event.value.strip()
+        text = event.text_area.text.strip()
         dropdown = self.query_one("#command-dropdown", expect_type=Static)
 
         if text.startswith("/") and len(text) >= 1:
@@ -421,10 +453,8 @@ class OhmApp(App[None]):
         dropdown.styles.display = "none"
         self._dropdown_open = False
 
-    @on(Input.Submitted, "#command-input")
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        """Handle input submission."""
-        text = event.value.strip()
+    def _handle_input_submit(self, text: str) -> None:
+        """Handle submitted input text (shared by action and internal calls)."""
         chat = self.query_one("ChatArea")
 
         if text.startswith("/"):
@@ -442,8 +472,6 @@ class OhmApp(App[None]):
                 exclusive=False,
             )
 
-        event.input.value = ""
-
         try:
             dropdown = self.query_one("#command-dropdown")
             dropdown.styles.display = "none"
@@ -453,6 +481,10 @@ class OhmApp(App[None]):
 
     async def _stream_agent_response(self, prompt: str, thinking_widget: Any) -> None:
         """Stream response from agent in background worker."""
+        import time as _time
+        _t0 = _time.monotonic()
+        self.log(f"[stream] Starting prompt={prompt[:60]!r}...")
+
         # Yield to event loop so UI renders user message + thinking widget immediately
         await asyncio.sleep(0)
         chat = self.query_one("ChatArea")
@@ -478,41 +510,117 @@ class OhmApp(App[None]):
                 )
                 return
 
-            # Stream response
-            async for event in self.agent.stream(prompt):
-                if isinstance(event, dict):
-                    # Handle thinking/reasoning steps vs text content
-                    event_type = event.get("type", "")
-                    if event_type == "reasoning" or "thought" in event:
-                        thought = event.get("thought", event.get("content", ""))
-                        thinking_widget.thought_text += str(thought)
-                    elif "data" in event or "text" in event or "content" in event:
-                        chunk = event.get("data") or event.get("text") or event.get("content") or ""
-                        if chunk:
-                            if thinking_widget.is_active:
-                                thinking_widget.is_active = False
-                            if agent_msg is None:
-                                agent_msg = chat.add_message("agent", "")
-                            full_response += str(chunk)
-                            agent_msg.update_content(full_response)
-                elif isinstance(event, str):
+            _SKIP_TYPES = {"tool_use", "tool_result", "function_call",
+                           "function_result", "error", "warning", "status", "meta"}
+
+            event_count = 0
+            has_text = False
+            stream_iter = self.agent.stream(prompt).__aiter__()
+            while True:
+                try:
+                    event = await asyncio.wait_for(
+                        stream_iter.__anext__(), timeout=120
+                    )
+                except StopAsyncIteration:
+                    break
+
+                event_count += 1
+
+                # ── Plain string → text ───────────────────────────
+                if isinstance(event, str):
+                    self.log(f"[stream]  #{event_count} str ({len(event)}c): {event[:80]!r}")
+                    has_text = True
                     if thinking_widget.is_active:
                         thinking_widget.is_active = False
                     if agent_msg is None:
                         agent_msg = chat.add_message("agent", "")
                     full_response += event
                     agent_msg.update_content(full_response)
+                    chat.scroll_to_bottom()
+                    continue
+
+                # ── Dict event ─────────────────────────────────────
+                if not isinstance(event, dict):
+                    self.log(f"[stream]  #{event_count} SKIP type={type(event).__name__}")
+                    continue
+
+                etype = event.get("type", "")
+                self.log(f"[stream]  #{event_count} dict type={etype!r} keys={list(event.keys())}")
+
+                # Reasoning / thought
+                if etype == "reasoning" or "thought" in event:
+                    thought = (event.get("thought") or event.get("reasoning")
+                               or event.get("content") or event.get("data") or "")
+                    if thought:
+                        thinking_widget.thought_text += str(thought)
+                    continue
+
+                # Skip known non-text types
+                if etype in _SKIP_TYPES:
+                    continue
+
+                # Check for known text keys (same logic as original working code)
+                if any(k in event for k in ("delta", "response", "data", "text", "content")):
+                    for key in ("delta", "response", "data", "text", "content"):
+                        val = event.get(key)
+                        if val is None or val == "":
+                            continue
+                        # Skip structured data (tool calls, metadata blocks)
+                        if isinstance(val, (dict, list)):
+                            continue
+                        text_chunk = str(val)
+                        if text_chunk:
+                            self.log(f"[stream]  #{event_count} text via {key!r}: {text_chunk[:80]!r}")
+                            has_text = True
+                            if thinking_widget.is_active:
+                                thinking_widget.is_active = False
+                            if agent_msg is None:
+                                agent_msg = chat.add_message("agent", "")
+                            full_response += text_chunk
+                            agent_msg.update_content(full_response)
+                            chat.scroll_to_bottom()
+                            break
+                else:
+                    self.log(f"[stream]  #{event_count} UNHANDLED: {event}")
 
             if thinking_widget.is_active:
                 thinking_widget.is_active = False
 
-            if not full_response and agent_msg is None:
+            _elapsed = _time.monotonic() - _t0
+            self.log(f"[stream] DONE {_elapsed:.1f}s | {event_count} events | "
+                     f"has_text={has_text} | response_len={len(full_response)}")
+
+            if not has_text and agent_msg is None:
+                self.log(f"[stream] WARNING: no text received, showing fallback message")
                 chat.add_message("agent", "Response received from agent.")
 
+            # Accumulate tokens and update progress bar
+            metrics = self.agent.last_metrics
+            if metrics:
+                self._total_tokens_used += metrics.get("total_tokens", 0)
+            else:
+                self._total_tokens_used += max(len(full_response) // 2, 0)
+            try:
+                self.query_one(ContextProgress).update(
+                    tokens_used=self._total_tokens_used,
+                    context_window=self._current_context_window,
+                )
+            except Exception:
+                pass
+
+        except asyncio.CancelledError:
+            thinking_widget.is_active = False
+            self.log("[stream] CANCELLED (app shutting down)")
+        except asyncio.TimeoutError:
+            thinking_widget.is_active = False
+            chat.add_message("system", "Agent response timed out after 120s.")
+            self.notify("Agent timed out", severity="error")
+            self.log("[stream] TIMEOUT after 120s")
         except Exception as exc:
             thinking_widget.is_active = False
             chat.add_message("system", f"Agent error: {exc}")
             self.notify(f"Agent error: {exc}", severity="error")
+            self.log(f"[stream] ERROR: {exc}")
 
 
 def main() -> None:

@@ -121,6 +121,133 @@ class TestAgent:
         assert result == {}
 
 
+class TestAgentLastMetrics:
+    """Tests for Agent.last_metrics property."""
+
+    def test_last_metrics_default_empty(self):
+        """Before any execution, last_metrics should be empty dict."""
+        agent = Agent(AgentConfig())
+        assert agent.last_metrics == {}
+
+    async def test_last_metrics_after_run(self):
+        """After run() completes, last_metrics should contain usage data."""
+        agent = Agent(AgentConfig())
+
+        class FakeMetrics:
+            def get_summary(self):
+                return {
+                    "accumulated_usage": {
+                        "totalTokens": 150,
+                        "inputTokens": 100,
+                        "outputTokens": 50,
+                    },
+                    "total_cycles": 1,
+                    "total_duration": 1.5,
+                    "tool_usage": {},
+                }
+
+        class FakeMsg:
+            content = [{"text": "Hello world"}]
+
+        class FakeResult:
+            message = FakeMsg()
+            metrics = FakeMetrics()
+
+        agent._ensure_agent = lambda: (lambda prompt: FakeResult())
+
+        resp = await agent.run("test prompt")
+        assert agent.last_metrics["total_tokens"] == 150
+        assert agent.last_metrics["input_tokens"] == 100
+        assert agent.last_metrics["output_tokens"] == 50
+
+    async def test_last_metrics_after_stream(self):
+        """After stream() iteration completes, last_metrics should contain usage data."""
+        agent = Agent(AgentConfig())
+
+        class FakeMetrics:
+            def get_summary(self):
+                return {
+                    "accumulated_usage": {
+                        "totalTokens": 200,
+                        "inputTokens": 120,
+                        "outputTokens": 80,
+                    },
+                    "total_cycles": 1,
+                    "total_duration": 2.0,
+                    "tool_usage": {},
+                }
+
+        class FakeMsg:
+            content = [{"text": "Hello"}]
+
+        class FakeResult:
+            message = FakeMsg()
+            metrics = FakeMetrics()
+
+        class FakeStrandsAgent:
+            async def stream_async(self, prompt):
+                yield {"type": "text", "data": "Hello"}
+
+            _last_result = FakeResult()
+
+        agent._ensure_agent = lambda: FakeStrandsAgent()
+
+        events = []
+        async for event in agent.stream("test prompt"):
+            events.append(event)
+
+        assert agent.last_metrics["total_tokens"] == 200
+        assert agent.last_metrics["input_tokens"] == 120
+
+    async def test_last_metrics_after_run_with_different_data(self):
+        """Test triangulation: different metrics shape after run()."""
+        agent = Agent(AgentConfig())
+
+        class FakeMetrics:
+            def get_summary(self):
+                return {
+                    "accumulated_usage": {
+                        "totalTokens": 9999,
+                        "inputTokens": 5000,
+                        "outputTokens": 4999,
+                    },
+                    "total_cycles": 3,
+                    "total_duration": 5.0,
+                    "tool_usage": {"file_read": 2},
+                }
+
+        class FakeMsg:
+            content = [{"text": "Different result"}]
+
+        class FakeResult:
+            message = FakeMsg()
+            metrics = FakeMetrics()
+
+        agent._ensure_agent = lambda: (lambda prompt: FakeResult())
+
+        resp = await agent.run("another prompt")
+        assert agent.last_metrics["total_tokens"] == 9999
+        assert agent.last_metrics["input_tokens"] == 5000
+        assert agent.last_metrics["output_tokens"] == 4999
+        assert agent.last_metrics["total_cycles"] == 3
+
+    async def test_last_metrics_empty_when_no_result(self):
+        """When strands agent has no _last_result, last_metrics should be empty."""
+        agent = Agent(AgentConfig())
+
+        class FakeStrandsAgent:
+            async def stream_async(self, prompt):
+                yield {"type": "text", "data": "Hello"}
+
+        agent._ensure_agent = lambda: FakeStrandsAgent()
+
+        events = []
+        async for event in agent.stream("test"):
+            events.append(event)
+
+        assert agent.last_metrics == {}
+
+
 class TestProviderMap:
     def test_all_providers_have_defaults(self):
         for provider in _PROVIDER_MODEL_MAP:
