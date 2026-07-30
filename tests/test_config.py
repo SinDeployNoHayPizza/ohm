@@ -113,7 +113,7 @@ class TestOHMConfig:
     def test_available_providers_empty_when_no_keys(self):
         cfg = OHMConfig()
         # Clear all keys
-        for var in ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY", "AWS_ACCESS_KEY_ID"]:
+        for var in ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "AWS_ACCESS_KEY_ID"]:
             os.environ.pop(var, None)
         available = cfg.available_providers
         assert "ollama" in available  # ollama always available

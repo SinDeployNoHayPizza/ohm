@@ -289,7 +289,7 @@ ohm gateway --protocol a2a --listen 0.0.0.0:8080
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/ohm.git
+git clone https://github.com/SinDeployNoHayPizza/ohm.git
 cd ohm
 
 # Install dependencies
@@ -348,7 +348,7 @@ Non-interactive mode for automation and cloud deployment:
 echo "Fix the bug in auth.py" | ohm run --headless
 
 # Docker execution
-docker run -e OHM_API_KEY=$KEY your-org/ohm run "Deploy to staging"
+docker run -e OHM_API_KEY=$KEY SinDeployNoHayPizza/ohm run "Deploy to staging"
 
 # CI/CD integration
 ohm run --headless --config .ohm/ci.yaml "Run tests and report"
@@ -587,7 +587,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ```bash
 # Clone and install
-git clone https://github.com/your-org/ohm.git
+git clone https://github.com/SinDeployNoHayPizza/ohm.git
 cd ohm
 uv sync
 
