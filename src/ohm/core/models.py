@@ -1,5 +1,6 @@
 """OHM Data Models - Shared data structures."""
 
+import warnings
 from dataclasses import dataclass, field
 from typing import Any
 from datetime import datetime
@@ -102,9 +103,22 @@ class TokenUsage:
 
 @dataclass
 class ProviderInfo:
-    """Provider information."""
+    """Provider information.
+
+    .. deprecated::
+        Use ``ProviderConfig`` from ``ohm.core.provider`` (see ``PROVIDER_CATALOG``)
+        instead. Kept for backward compatibility.
+    """
+
     name: str
     display_name: str
     status: str  # healthy, degraded, unhealthy
     models: list[dict[str, Any]] = field(default_factory=list)
     latency_ms: float = 0.0
+
+    def __post_init__(self) -> None:
+        warnings.warn(
+            "ProviderInfo is deprecated; use ProviderConfig from ohm.core.provider",
+            DeprecationWarning,
+            stacklevel=2,
+        )

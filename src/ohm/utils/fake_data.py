@@ -5,81 +5,6 @@ All data is designed to look authentic and demonstrate the full UI capabilities.
 """
 
 from datetime import datetime, timedelta
-import random
-
-# ──────────────────────────────────────────────────────────────
-# Provider & Model Data
-# ──────────────────────────────────────────────────────────────
-
-FAKE_PROVIDERS = [
-    {
-        "name": "anthropic",
-        "display_name": "Anthropic",
-        "models": [
-            {"id": "claude-sonnet-4-20250514", "name": "Claude Sonnet 4", "context_window": 200000, "cost_input": 3.0, "cost_output": 15.0},
-            {"id": "claude-3-opus-20240229", "name": "Claude 3 Opus", "context_window": 200000, "cost_input": 15.0, "cost_output": 75.0},
-            {"id": "claude-3-haiku-20240307", "name": "Claude 3 Haiku", "context_window": 200000, "cost_input": 0.25, "cost_output": 1.25},
-        ],
-        "status": "healthy",
-        "latency_ms": 2340,
-    },
-    {
-        "name": "openai",
-        "display_name": "OpenAI",
-        "models": [
-            {"id": "gpt-4-turbo", "name": "GPT-4 Turbo", "context_window": 128000, "cost_input": 10.0, "cost_output": 30.0},
-            {"id": "gpt-4", "name": "GPT-4", "context_window": 8192, "cost_input": 30.0, "cost_output": 60.0},
-            {"id": "gpt-3.5-turbo", "name": "GPT-3.5 Turbo", "context_window": 16385, "cost_input": 0.5, "cost_output": 1.5},
-        ],
-        "status": "healthy",
-        "latency_ms": 1890,
-    },
-    {
-        "name": "google",
-        "display_name": "Google Gemini",
-        "models": [
-            {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro", "context_window": 1000000, "cost_input": 1.25, "cost_output": 5.0},
-            {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "context_window": 1000000, "cost_input": 0.15, "cost_output": 0.60},
-            {"id": "gemini-2.0-flash", "name": "Gemini 2.0 Flash", "context_window": 1000000, "cost_input": 0.10, "cost_output": 0.40},
-        ],
-        "status": "healthy",
-        "latency_ms": 1560,
-    },
-    {
-        "name": "nvidia",
-        "display_name": "NVIDIA NIM",
-        "models": [
-            {"id": "nemotron-70b", "name": "Nemotron 70B", "context_window": 128000, "cost_input": 0.80, "cost_output": 3.20},
-            {"id": "mistral-large", "name": "Mistral Large", "context_window": 128000, "cost_input": 1.00, "cost_output": 3.00},
-            {"id": "deepseek-r1", "name": "DeepSeek R1", "context_window": 128000, "cost_input": 0.55, "cost_output": 2.19},
-        ],
-        "status": "healthy",
-        "latency_ms": 1720,
-    },
-    {
-        "name": "ollama-cloud",
-        "display_name": "Ollama Cloud",
-        "models": [
-            {"id": "llama-3.3-70b", "name": "Llama 3.3 70B", "context_window": 128000, "cost_input": 0.20, "cost_output": 0.80},
-            {"id": "qwen-2.5-72b", "name": "Qwen 2.5 72B", "context_window": 128000, "cost_input": 0.25, "cost_output": 1.00},
-            {"id": "deepseek-v3", "name": "DeepSeek V3", "context_window": 128000, "cost_input": 0.14, "cost_output": 0.28},
-            {"id": "gemma-3-27b", "name": "Gemma 3 27B", "context_window": 128000, "cost_input": 0.10, "cost_output": 0.40},
-        ],
-        "status": "healthy",
-        "latency_ms": 980,
-    },
-    {
-        "name": "local",
-        "display_name": "Local (Ollama)",
-        "models": [
-            {"id": "llama-3-8b", "name": "Llama 3 8B", "context_window": 8192, "cost_input": 0.0, "cost_output": 0.0},
-            {"id": "mistral-7b", "name": "Mistral 7B", "context_window": 8192, "cost_input": 0.0, "cost_output": 0.0},
-            {"id": "phi-3", "name": "Phi-3 Mini", "context_window": 4096, "cost_input": 0.0, "cost_output": 0.0},
-        ],
-        "status": "degraded",
-        "latency_ms": 450,
-    },
-]
 
 # ──────────────────────────────────────────────────────────────
 # Chat Messages
@@ -137,21 +62,6 @@ FAKE_CHAT_MESSAGES = [
         "timestamp": datetime.now() - timedelta(minutes=50, seconds=30),
     },
 ]
-
-# ──────────────────────────────────────────────────────────────
-# Token Usage
-# ──────────────────────────────────────────────────────────────
-
-FAKE_TOKEN_USAGE = {
-    "input_tokens": 12450,
-    "output_tokens": 892,
-    "total_tokens": 13342,
-    "max_tokens": 200000,
-    "cost_usd": 0.089,
-    "session_cost_usd": 0.234,
-    "requests_count": 6,
-    "avg_latency_ms": 2100,
-}
 
 # ──────────────────────────────────────────────────────────────
 # Commands
@@ -485,27 +395,6 @@ OHM_LOGO_ANSI = OHM_LOGO_VARIANTS["blue"]  # default
 def get_random_logo() -> str:
     """Return a random ANSI logo variant."""
     return _random.choice(list(OHM_LOGO_VARIANTS.values()))
-
-
-# ──────────────────────────────────────────────────────────────
-# Status Data
-# ──────────────────────────────────────────────────────────────
-
-FAKE_STATUS = {
-    "version": "0.1.0-alpha",
-    "uptime": "2h 34m 12s",
-    "sandbox_status": "active",
-    "sandbox_mode": "strict",
-    "mcp_status": "connected",
-    "acp_status": "standby",
-    "a2a_status": "disabled",
-    "memory_usage": "245MB",
-    "cpu_usage": "12%",
-    "active_skills": ["python-debugger", "git-ops", "code-review"],
-    "pending_tasks": 0,
-    "completed_tasks": 23,
-    "failed_tasks": 1,
-}
 
 
 # ──────────────────────────────────────────────────────────────
