@@ -39,8 +39,10 @@ class TestSessionIdFormat:
         assert len(ids) == 10, "Generated session IDs must be unique"
 
     def test_sortable_by_timestamp(self):
-        """Earlier call produces an ID that sorts before a later call."""
+        """Earlier call produces an ID that sorts before a later call (when timestamp increments)."""
+        import time
         id_a = _gen_session_id()
+        time.sleep(1.0)
         id_b = _gen_session_id()
         assert id_a < id_b, "Session IDs should be lexicographically sortable"
 

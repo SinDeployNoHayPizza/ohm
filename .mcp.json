@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "engram": {
+      "command": "engram",
+      "args": [
+        "mcp",
+        "--tools=agent",
+        "--project=ohm"
+      ]
+    }
+  }
+}

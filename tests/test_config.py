@@ -152,7 +152,7 @@ class TestLoadConfig:
         _save_yaml(project_file, {"provider": "gemini", "model": "gemini-2.5-flash"})
         saved_model = os.environ.pop("OHM_MODEL", None)
         try:
-            cfg = load_config(global_path=global_file, project_path=project_file)
+            cfg = load_config(global_path=global_file, project_path=project_file, dotenv_path=tmp_path / ".env")
             assert cfg.provider == "gemini"
             assert cfg.model == "gemini-2.5-flash"
         finally:

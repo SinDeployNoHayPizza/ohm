@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.1.3 — 2026-07-31
+
+### Added
+- **Widget Input Auto-Resize**: `CommandInput` auto-expands up to 40% of viewport height (max 10 lines) upon multi-line text input or paste (`#widget-input-progress`).
+- **Real Token Usage Metrics**: `ContextProgress` bar now displays live token count and percentage of context window used (`#widget-input-progress`).
+
+### Fixed
+- **R3-001 (Gemini `base_url` Gating)**: Excluded `base_url` from Gemini model `client_args` to prevent SDK v2 `TypeError`, while maintaining `base_url` propagation through `AgentConfig` for other providers.
+- **R4-001 (CLI Gateway Gating)**: `base_url` is now strictly gated by matching CLI provider to prevent leaking proxy URLs and credentials when switching providers via arguments.
+- **Session Timestamp Sortability & Test Isolation**: Fixed timestamp sortability test timing and isolated project config override test from `.env` pollution.
+
 ## v0.1.2 — 2026-07-30
 
 ### Added
