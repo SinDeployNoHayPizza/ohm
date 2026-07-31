@@ -150,9 +150,67 @@ class TestLoadConfig:
         project_file = tmp_path / "project.yaml"
         _save_yaml(global_file, {"provider": "openai"})
         _save_yaml(project_file, {"provider": "gemini", "model": "gemini-2.5-flash"})
-        cfg = load_config(global_path=global_file, project_path=project_file)
-        assert cfg.provider == "gemini"
-        assert cfg.model == "gemini-2.5-flash"
+        saved_model = os.environ.pop("OHM_MODEL", None)
+        try:
+            cfg = load_config(global_path=global_file, project_path=project_file)
+            assert cfg.provider == "gemini"
+            assert cfg.model == "gemini-2.5-flash"
+        finally:
+            if saved_model is not None:
+                os.environ["OHM_MODEL"] = saved_model
+
+
+class TestResolveProvider:
+    def test_resolve_known_provider(self):
+        cfg = OHMConfig(provider="openai")
+        os.environ["OPENAI_API_KEY"] = "sk-test"
+        try:
+            provider = cfg.resolve_provider("openai")
+            from ohm.core.provider import OpenAIClientProvider
+            assert isinstance(provider, OpenAIClientProvider)
+            assert provider.config.name == "openai"
+        finally:
+            del os.environ["OPENAI_API_KEY"]
+
+    def test_resolve_unknown_provider_raises(self):
+        cfg = OHMConfig()
+        with pytest.raises(ValueError, match="Unknown provider"):
+            cfg.resolve_provider("nonexistent")
+
+    def test_resolve_nvidia_nim_propagates_custom_base_url(self):
+        """PC-R1-S2: custom base_url must reach the OpenAI-compatible client for nvidia-nim."""
+        from ohm.core.provider import OpenAICompatibleProvider
+
+        cfg = OHMConfig(provider="nvidia-nim", base_url="https://nim.custom.example.com")
+        provider = cfg.resolve_provider("nvidia-nim")
+        assert isinstance(provider, OpenAICompatibleProvider)
+        assert provider.config.base_url == "https://nim.custom.example.com"
+        model = provider.create_model()
+        assert model.client_args["base_url"] == "https://nim.custom.example.com"
+
+    def test_resolve_xiaomi_mimo_propagates_custom_base_url(self):
+        """PC-R1-S2: custom base_url must reach the OpenAI-compatible client for xiaomi-mimo."""
+        from ohm.core.provider import OpenAICompatibleProvider
+
+        cfg = OHMConfig(provider="xiaomi-mimo", base_url="https://mimo.custom.example.com")
+        provider = cfg.resolve_provider("xiaomi-mimo")
+        assert isinstance(provider, OpenAICompatibleProvider)
+        assert provider.config.base_url == "https://mimo.custom.example.com"
+        model = provider.create_model()
+        assert model.client_args["base_url"] == "https://mimo.custom.example.com"
+
+    def test_available_providers_with_keys(self):
+        cfg = OHMConfig()
+        os.environ["ANTHROPIC_API_KEY"] = "sk-ant"
+        os.environ["OPENAI_API_KEY"] = "sk-openai"
+        try:
+            available = cfg.available_providers
+            assert "anthropic" in available
+            assert "openai" in available
+            assert "ollama" in available
+        finally:
+            del os.environ["ANTHROPIC_API_KEY"]
+            del os.environ["OPENAI_API_KEY"]
 
     def test_env_var_overrides_project(self, tmp_path):
         project_file = tmp_path / "project.yaml"

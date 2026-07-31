@@ -13,6 +13,7 @@ import logging
 import os
 import sys
 import time
+import warnings
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -60,71 +61,26 @@ else:
 def _resolve_model(provider: str, model_id: str | None) -> Any:
     """Resolve provider + model_id into a strands model instance.
 
-    Uses the canonical strands API:
-        AnthropicModel(client_args=..., max_tokens=..., model_id=..., params=...)
-        OpenAIModel(client_args=..., model_id=..., params=...)
+    .. deprecated::
+        Use ``OHMConfig.resolve_provider(name).create_model(model_id)`` instead.
     """
-    import importlib
+    warnings.warn(
+        "_resolve_model is deprecated; use OHMConfig.resolve_provider().create_model()",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    from ohm.core.config import OHMConfig
+    from ohm.core.provider import create_provider
 
     provider_key = provider.lower()
-    if provider_key not in _PROVIDER_MODEL_MAP:
-        supported = ", ".join(_PROVIDER_MODEL_MAP)
-        raise ValueError(f"Unknown provider '{provider}'. Supported: {supported}")
-
-    module_path, class_name = _PROVIDER_MODEL_MAP[provider_key]
-    resolved_model = model_id or _DEFAULT_MODELS.get(provider_key, "")
-
+    ohm_cfg = OHMConfig(provider=provider_key, model=model_id or "")
     try:
-        module = importlib.import_module(module_path)
-        model_cls = getattr(module, class_name)
-    except (ImportError, AttributeError) as exc:
-        raise RuntimeError(
-            f"Could not load strands model for provider '{provider}': {exc}"
-        ) from exc
-
-    # Build kwargs per provider docs
-    kwargs: dict[str, Any] = {}
-
-    if provider_key == "anthropic":
-        # https://strandsagents.com/docs/user-guide/concepts/model-providers/anthropic/
-        # AnthropicModel(client_args={"api_key": ...}, max_tokens=..., model_id=..., params=...)
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if api_key:
-            kwargs["client_args"] = {"api_key": api_key}
-        kwargs["max_tokens"] = 4096
-        if resolved_model:
-            kwargs["model_id"] = resolved_model
-        kwargs["params"] = {"temperature": 0.7}
-
-    elif provider_key == "openai":
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if api_key:
-            kwargs["client_args"] = {"api_key": api_key}
-        if resolved_model:
-            kwargs["model_id"] = resolved_model
-
-    elif provider_key == "gemini":
-        # https://strandsagents.com/docs/user-guide/concepts/model-providers/google/
-        # GeminiModel(client_args={"api_key": ...}, model_id=..., params=...)
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if api_key:
-            kwargs["client_args"] = {"api_key": api_key}
-        if resolved_model:
-            kwargs["model_id"] = resolved_model
-        kwargs["params"] = {
-            "temperature": 0.7,
-            "max_output_tokens": 4096,
-        }
-
-    elif provider_key == "ollama":
-        if resolved_model:
-            kwargs["model_id"] = resolved_model
-
-    elif provider_key == "bedrock":
-        if resolved_model:
-            kwargs["model_id"] = resolved_model
-
-    return model_cls(**kwargs)
+        prov = ohm_cfg.resolve_provider(provider_key)
+    except ValueError as exc:
+        from ohm.core.provider import KNOWN_PROVIDERS
+        supported = ", ".join(KNOWN_PROVIDERS)
+        raise ValueError(f"Unknown provider '{provider}'. Supported: {supported}") from exc
+    return prov.create_model(model_id)
 
 
 def _load_tools(tool_names: list[str] | None = None) -> list[Any]:
@@ -228,7 +184,19 @@ class Agent:
 
         from strands import Agent as StrandsAgent
 
-        model = _resolve_model(self.config.provider, self.config.model)
+        from ohm.core.config import OHMConfig
+
+        ohm_cfg = OHMConfig(
+            provider=self.config.provider,
+            model=self.config.model,
+            max_tokens=self.config.max_tokens,
+            temperature=self.config.temperature,
+            sandbox=self.config.sandbox,
+            tools=self.config.tools,
+            system_prompt=self.config.system_prompt,
+        )
+        provider = ohm_cfg.resolve_provider()
+        model = provider.create_model(self.config.model)
         tools = _load_tools(self.config.tools)
 
         self._strands_agent = StrandsAgent(

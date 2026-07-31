@@ -69,6 +69,8 @@ _API_KEY_ENV: dict[str, list[str]] = {
     "gemini": ["GEMINI_API_KEY"],
     "bedrock": ["AWS_ACCESS_KEY_ID"],
     "ollama": [],  # no key needed
+    "nvidia-nim": ["NVAPI_KEY"],
+    "xiaomi-mimo": ["MIMO_API_KEY"],
 }
 
 # ── YAML loading ──────────────────────────────────────────────
@@ -142,6 +144,7 @@ class OHMConfig:
     ])
     mcp: dict[str, Any] = field(default_factory=dict)
     log_level: str = "INFO"
+    base_url: str | None = None
 
     # Source tracking (which files were loaded)
     global_config_path: Path | None = None
@@ -159,10 +162,24 @@ class OHMConfig:
     @property
     def available_providers(self) -> list[str]:
         """List providers that have API keys configured."""
-        return [
-            p for p in _API_KEY_ENV
-            if p == "ollama" or self.api_key_for(p) is not None
-        ]
+        from ohm.core.provider import KNOWN_PROVIDERS
+
+        available: list[str] = []
+        for name in KNOWN_PROVIDERS:
+            if name == "ollama" or self.api_key_for(name) is not None:
+                available.append(name)
+        return available
+
+    def resolve_provider(self, name: str | None = None) -> Any:
+        """Return a configured Provider instance for the given name."""
+        from ohm.core.provider import create_provider
+
+        provider_name = name or self.provider
+        return create_provider(
+            provider_name,
+            api_key=self.api_key_for(provider_name),
+            base_url=self.base_url,
+        )
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize config to dict (for YAML/JSON output)."""
@@ -177,6 +194,7 @@ class OHMConfig:
             "tools": self.tools,
             "mcp": self.mcp,
             "log_level": self.log_level,
+            "base_url": self.base_url,
         }
 
 
@@ -243,6 +261,7 @@ def load_config(
         tools=merged["tools"],
         mcp=merged.get("mcp", {}),
         log_level=merged.get("log_level", "INFO"),
+        base_url=merged.get("base_url"),
         global_config_path=gpath if gpath.exists() else None,
         project_config_path=ppath if ppath.exists() else None,
         dotenv_path=dpath if dpath.exists() else None,

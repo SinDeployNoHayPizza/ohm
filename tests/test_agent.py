@@ -248,6 +248,42 @@ class TestAgentLastMetrics:
         assert agent.last_metrics == {}
 
 
+class TestAgentProviderIntegration:
+    def test_ensure_agent_uses_provider_create_model(self, monkeypatch):
+        """Agent._ensure_agent() MUST use Provider.create_model(), not _resolve_model."""
+        create_calls: list[str] = []
+
+        class FakeModel:
+            pass
+
+        class FakeProvider:
+            def create_model(self, model_id=None):
+                create_calls.append(model_id or "")
+                return FakeModel()
+
+        cfg = AgentConfig(provider="anthropic", model="claude-sonnet-4-6")
+        agent = Agent(cfg)
+
+        monkeypatch.setattr(
+            "ohm.core.config.OHMConfig.resolve_provider",
+            lambda self, name=None: FakeProvider(),
+        )
+        monkeypatch.setattr(
+            "ohm.core.agent._load_tools",
+            lambda names: [],
+        )
+
+        class FakeStrandsAgent:
+            def __init__(self, **kwargs):
+                self.kwargs = kwargs
+
+        monkeypatch.setattr("strands.Agent", FakeStrandsAgent)
+
+        agent._ensure_agent()
+        assert create_calls == ["claude-sonnet-4-6"]
+        assert agent._strands_agent is not None
+
+
 class TestProviderMap:
     def test_all_providers_have_defaults(self):
         for provider in _PROVIDER_MODEL_MAP:
