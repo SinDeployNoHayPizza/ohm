@@ -52,7 +52,11 @@ def handler(args: argparse.Namespace) -> int:
 
     try:
         from ohm.core.config import get_config
-        base_url = get_config().base_url
+        cfg = get_config()
+        # R4-001: base_url only applies when the CLI provider matches the
+        # provider it was configured for; otherwise the CLI provider's API
+        # key would be sent to a foreign gateway host.
+        base_url = cfg.base_url if args.provider == cfg.provider else None
     except Exception:
         base_url = None
 

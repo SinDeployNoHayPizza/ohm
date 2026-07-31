@@ -230,8 +230,12 @@ class TestResolveProvider:
         finally:
             del os.environ["OPENAI_API_KEY"]
 
-    def test_resolve_gemini_propagates_custom_base_url(self):
-        """R3-001: custom base_url must reach GeminiProvider.create_model() client_args."""
+    def test_resolve_gemini_excludes_base_url_from_client_args(self):
+        """R3-001 v2: gemini client_args must be api_key only.
+
+        google-genai v2 ``Client.__init__`` accepts no ``base_url`` and no
+        ``**kwargs`` — passing one would raise TypeError at client construction.
+        """
         from ohm.core.provider import GeminiProvider
 
         cfg = OHMConfig(provider="gemini", base_url="https://gemini.custom.example.com")
@@ -241,7 +245,8 @@ class TestResolveProvider:
         os.environ["GEMINI_API_KEY"] = "sk-gemini-custom"
         try:
             model = provider.create_model()
-            assert model.client_args["base_url"] == "https://gemini.custom.example.com"
+            assert model.client_args.get("api_key") == "sk-gemini-custom"
+            assert "base_url" not in model.client_args
         finally:
             del os.environ["GEMINI_API_KEY"]
 

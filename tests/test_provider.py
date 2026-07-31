@@ -406,6 +406,20 @@ class TestProviderSubclasses:
         from strands.models.gemini import GeminiModel
         assert isinstance(model, GeminiModel)
 
+    @patch.dict("os.environ", {}, clear=True)
+    def test_gemini_create_model_without_api_key_no_client_args(self, config_gemini):
+        """R3-001 v2: without GEMINI_API_KEY, client_args must be omitted entirely.
+
+        Exercises the api_key-absent branch — client_args must never be
+        synthesized (no api_key, and no base_url: google-genai has no such param).
+        """
+        from ohm.core.provider import GeminiProvider
+        prov = GeminiProvider(config_gemini)
+        model = prov.create_model()
+        from strands.models.gemini import GeminiModel
+        assert isinstance(model, GeminiModel)
+        assert model.client_args == {}
+
     def test_ollama_instantiation(self, config_ollama):
         from ohm.core.provider import OllamaProvider
         prov = OllamaProvider(config_ollama)

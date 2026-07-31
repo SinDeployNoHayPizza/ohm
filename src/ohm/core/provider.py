@@ -380,9 +380,12 @@ class GeminiProvider(Provider):
         from strands.models.gemini import GeminiModel
 
         kwargs: dict[str, Any] = {}
-        client_args = self._build_client_args("GEMINI_API_KEY")
-        if client_args:
-            kwargs["client_args"] = client_args
+        # R3-001 v2: google-genai v2 Client.__init__ accepts NO base_url and
+        # NO **kwargs, so client_args must be api_key only — a base_url here
+        # would raise TypeError at genai.Client construction.
+        api_key = self._get_env("GEMINI_API_KEY")
+        if api_key:
+            kwargs["client_args"] = {"api_key": api_key}
         kwargs["model_id"] = model_id or self._default_model_id()
         kwargs["params"] = {"temperature": 0.7, "max_output_tokens": 4096}
         return GeminiModel(**kwargs)
