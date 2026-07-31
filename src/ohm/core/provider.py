@@ -323,14 +323,12 @@ class AnthropicProvider(Provider):
         self,
         model_id: str | None = None,
     ) -> Any:
-        import os
-
         from strands.models.anthropic import AnthropicModel
 
         kwargs: dict[str, Any] = {}
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if api_key:
-            kwargs["client_args"] = {"api_key": api_key}
+        client_args = self._build_client_args("ANTHROPIC_API_KEY")
+        if client_args:
+            kwargs["client_args"] = client_args
         kwargs["max_tokens"] = 4096
         kwargs["model_id"] = model_id or self._default_model_id()
         kwargs["params"] = {"temperature": 0.7}
@@ -353,14 +351,12 @@ class OpenAIClientProvider(Provider):
         self,
         model_id: str | None = None,
     ) -> Any:
-        import os
-
         from strands.models.openai import OpenAIModel
 
         kwargs: dict[str, Any] = {}
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if api_key:
-            kwargs["client_args"] = {"api_key": api_key}
+        client_args = self._build_client_args("OPENAI_API_KEY")
+        if client_args:
+            kwargs["client_args"] = client_args
         kwargs["model_id"] = model_id or self._default_model_id()
         return OpenAIModel(**kwargs)
 
@@ -381,14 +377,12 @@ class GeminiProvider(Provider):
         self,
         model_id: str | None = None,
     ) -> Any:
-        import os
-
         from strands.models.gemini import GeminiModel
 
         kwargs: dict[str, Any] = {}
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if api_key:
-            kwargs["client_args"] = {"api_key": api_key}
+        client_args = self._build_client_args("GEMINI_API_KEY")
+        if client_args:
+            kwargs["client_args"] = client_args
         kwargs["model_id"] = model_id or self._default_model_id()
         kwargs["params"] = {"temperature": 0.7, "max_output_tokens": 4096}
         return GeminiModel(**kwargs)

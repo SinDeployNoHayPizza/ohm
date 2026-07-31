@@ -199,6 +199,52 @@ class TestResolveProvider:
         model = provider.create_model()
         assert model.client_args["base_url"] == "https://mimo.custom.example.com"
 
+    def test_resolve_anthropic_propagates_custom_base_url(self):
+        """R3-001: custom base_url must reach AnthropicProvider.create_model() client."""
+        from ohm.core.provider import AnthropicProvider
+
+        cfg = OHMConfig(provider="anthropic", base_url="https://anthropic.custom.example.com")
+        provider = cfg.resolve_provider("anthropic")
+        assert isinstance(provider, AnthropicProvider)
+        assert provider.config.base_url == "https://anthropic.custom.example.com"
+        os.environ["ANTHROPIC_API_KEY"] = "sk-ant-custom"
+        try:
+            model = provider.create_model()
+            # AnthropicModel stores the SDK client, not client_args; the gateway lands on it
+            assert str(model.client.base_url) == "https://anthropic.custom.example.com"
+        finally:
+            del os.environ["ANTHROPIC_API_KEY"]
+
+    def test_resolve_openai_propagates_custom_base_url(self):
+        """R3-001: custom base_url must reach OpenAIClientProvider.create_model() client_args."""
+        from ohm.core.provider import OpenAIClientProvider
+
+        cfg = OHMConfig(provider="openai", base_url="https://openai.custom.example.com")
+        provider = cfg.resolve_provider("openai")
+        assert isinstance(provider, OpenAIClientProvider)
+        assert provider.config.base_url == "https://openai.custom.example.com"
+        os.environ["OPENAI_API_KEY"] = "sk-openai-custom"
+        try:
+            model = provider.create_model()
+            assert model.client_args["base_url"] == "https://openai.custom.example.com"
+        finally:
+            del os.environ["OPENAI_API_KEY"]
+
+    def test_resolve_gemini_propagates_custom_base_url(self):
+        """R3-001: custom base_url must reach GeminiProvider.create_model() client_args."""
+        from ohm.core.provider import GeminiProvider
+
+        cfg = OHMConfig(provider="gemini", base_url="https://gemini.custom.example.com")
+        provider = cfg.resolve_provider("gemini")
+        assert isinstance(provider, GeminiProvider)
+        assert provider.config.base_url == "https://gemini.custom.example.com"
+        os.environ["GEMINI_API_KEY"] = "sk-gemini-custom"
+        try:
+            model = provider.create_model()
+            assert model.client_args["base_url"] == "https://gemini.custom.example.com"
+        finally:
+            del os.environ["GEMINI_API_KEY"]
+
     def test_available_providers_with_keys(self):
         cfg = OHMConfig()
         os.environ["ANTHROPIC_API_KEY"] = "sk-ant"

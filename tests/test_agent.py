@@ -23,6 +23,7 @@ class TestAgentConfig:
         assert cfg.sandbox is True
         assert cfg.max_tokens == 4096
         assert cfg.temperature == 0.7
+        assert cfg.base_url is None
         assert "file_read" in cfg.tools
 
     def test_custom_values(self):
@@ -38,6 +39,15 @@ class TestAgentConfig:
         assert cfg.max_tokens == 8192
         assert cfg.temperature == 0.3
         assert cfg.sandbox is False
+
+    def test_custom_base_url(self):
+        """R3-001: AgentConfig must carry a custom base_url for gateway/proxy providers."""
+        cfg = AgentConfig(
+            provider="nvidia-nim",
+            model="nemotron-70b",
+            base_url="https://nim.custom.example.com",
+        )
+        assert cfg.base_url == "https://nim.custom.example.com"
 
 
 class TestAgentResponse:
@@ -282,6 +292,68 @@ class TestAgentProviderIntegration:
         agent._ensure_agent()
         assert create_calls == ["claude-sonnet-4-6"]
         assert agent._strands_agent is not None
+
+    @pytest.mark.parametrize(
+        "provider, model_id, base_url",
+        [
+            ("nvidia-nim", "nemotron-70b", "https://nim.custom.example.com"),
+            ("xiaomi-mimo", "mimo-v2", "https://mimo.custom.example.com"),
+            ("anthropic", "claude-sonnet-4-6", "https://anthropic.custom.example.com"),
+        ],
+    )
+    def test_ensure_agent_propagates_base_url_to_provider(self, monkeypatch, provider, model_id, base_url):
+        """R3-001: AgentConfig.base_url must reach the OHMConfig used to build the provider.
+
+        The OHMConfig rebuilt inside _ensure_agent() MUST carry base_url; otherwise
+        resolve_provider() falls back to catalog defaults and gateway traffic
+        silently goes to the public host.
+        """
+        captured: list[str | None] = []
+
+        class FakeModel:
+            pass
+
+        class FakeProvider:
+            def create_model(self, model_id=None):
+                return FakeModel()
+
+        def fake_resolve(self, name=None):
+            captured.append(self.base_url)
+            return FakeProvider()
+
+        monkeypatch.setattr(
+            "ohm.core.config.OHMConfig.resolve_provider",
+            fake_resolve,
+        )
+        monkeypatch.setattr(
+            "ohm.core.agent._load_tools",
+            lambda names: [],
+        )
+
+        class FakeStrandsAgent:
+            def __init__(self, **kwargs):
+                self.kwargs = kwargs
+
+        monkeypatch.setattr("strands.Agent", FakeStrandsAgent)
+
+        cfg = AgentConfig(provider=provider, model=model_id, base_url=base_url)
+        agent = Agent(cfg)
+        agent._ensure_agent()
+        assert captured == [base_url]
+
+    def test_default_config_path_carries_base_url(self, monkeypatch):
+        """R3-001: Agent() without config must copy ohm_cfg.base_url into AgentConfig."""
+        from ohm.core.config import OHMConfig
+
+        fake_cfg = OHMConfig(
+            provider="nvidia-nim",
+            model="nemotron-70b",
+            base_url="https://nim.custom.example.com",
+        )
+        monkeypatch.setattr("ohm.core.config.get_config", lambda: fake_cfg)
+
+        agent = Agent()
+        assert agent.config.base_url == "https://nim.custom.example.com"
 
 
 class TestProviderMap:

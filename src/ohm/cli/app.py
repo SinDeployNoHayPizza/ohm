@@ -229,6 +229,7 @@ class OhmApp(App[None]):
             sandbox=self.config.sandbox,
             tools=self.config.tools,
             system_prompt=self.config.system_prompt or AgentConfig.system_prompt,
+            base_url=self.config.base_url,
         ))
         self.commands = CommandRegistry()
 

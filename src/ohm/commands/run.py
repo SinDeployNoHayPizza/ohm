@@ -47,9 +47,16 @@ def handler(args: argparse.Namespace) -> int:
     print(f"[run] provider={args.provider} {model_info}", file=sys.stderr)
     print(f"[run] prompt: {args.prompt}", file=sys.stderr)
 
+    try:
+        from ohm.core.config import get_config
+        base_url = get_config().base_url
+    except Exception:
+        base_url = None
+
     config = AgentConfig(
         provider=args.provider,
         model=args.model or "",
+        base_url=base_url,
     )
     agent = Agent(config)
 

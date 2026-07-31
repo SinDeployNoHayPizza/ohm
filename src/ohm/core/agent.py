@@ -117,6 +117,7 @@ class AgentConfig:
         "You have access to file operations, shell, editor, calculator, and HTTP tools. "
         "Execute tasks precisely and report results clearly."
     )
+    base_url: str | None = None
 
 
 @dataclass
@@ -170,6 +171,7 @@ class Agent:
                     sandbox=ohm_cfg.sandbox,
                     tools=ohm_cfg.tools,
                     system_prompt=ohm_cfg.system_prompt or AgentConfig.system_prompt,
+                    base_url=ohm_cfg.base_url,
                 )
             except Exception:
                 config = AgentConfig()
@@ -194,6 +196,7 @@ class Agent:
             sandbox=self.config.sandbox,
             tools=self.config.tools,
             system_prompt=self.config.system_prompt,
+            base_url=self.config.base_url,
         )
         provider = ohm_cfg.resolve_provider()
         model = provider.create_model(self.config.model)
