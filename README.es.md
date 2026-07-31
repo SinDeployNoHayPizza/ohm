@@ -550,11 +550,11 @@ interface:
 
 ## Hoja de Ruta
 
-### Fase 1 — Fundación ✅
+### Fase 1 — Fundación 🔄
 - [x] Andamiaje del proyecto con Python 3.12+, UV, Ruff
 - [x] Integración de Strands Agents
-- [ ] Interfaz CLI básica
-- [ ] Capa de abstracción de proveedores
+- [x] Interfaz CLI básica
+- [ ] Capa de abstracción de proveedores (en progreso)
 
 ### Fase 2 — Motor Core
 - [ ] Administrador de sandbox (gVisor / Docker)

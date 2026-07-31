@@ -547,11 +547,11 @@ interface:
 
 ## Roadmap
 
-### Phase 1 — Foundation ✅
+### Phase 1 — Foundation 🔄
 - [x] Project scaffold with Python 3.12+, UV, Ruff
 - [x] Strands Agents integration
-- [ ] Basic CLI interface
-- [ ] Provider abstraction layer
+- [x] Basic CLI interface
+- [ ] Provider abstraction layer (in progress)
 
 ### Phase 2 — Core Engine
 - [ ] Sandbox manager (gVisor / Docker)
