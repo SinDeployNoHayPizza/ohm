@@ -111,29 +111,32 @@ def _check_sessions() -> tuple[str, str]:
 
 
 def _check_providers() -> tuple[str, str]:
-    """Check which providers have API keys configured."""
-    from ohm.core.config import _API_KEY_ENV
-    available: list[str] = []
-    unavailable: list[str] = []
+    """Check provider health via Provider.check_health()."""
+    from ohm.core.config import get_config
+    from ohm.core.provider import KNOWN_PROVIDERS, ProviderStatus
 
-    for provider, env_vars in _API_KEY_ENV.items():
-        if provider == "ollama":
-            # Ollama doesn't need a key, just check if it's running
-            available.append("ollama (local)")
+    cfg = get_config()
+    healthy: list[str] = []
+    unhealthy: list[str] = []
+
+    for name in KNOWN_PROVIDERS:
+        try:
+            provider = cfg.resolve_provider(name)
+        except ValueError:
             continue
-        has_key = any(os.environ.get(v) for v in env_vars)
-        if has_key:
-            available.append(provider)
+        status = provider.check_health()
+        if status == ProviderStatus.HEALTHY:
+            healthy.append(name)
         else:
-            unavailable.append(provider)
+            unhealthy.append(name)
 
     parts: list[str] = []
-    if available:
-        parts.append(f"ready: {', '.join(available)}")
-    if unavailable:
-        parts.append(f"missing key: {', '.join(unavailable)}")
+    if healthy:
+        parts.append(f"healthy: {', '.join(healthy)}")
+    if unhealthy:
+        parts.append(f"unhealthy: {', '.join(unhealthy)}")
 
-    return ("ok" if available else "warn", f"Providers: {'; '.join(parts)}")
+    return ("ok" if healthy else "warn", f"Providers: {'; '.join(parts) if parts else 'none checked'}")
 
 
 def execute(args: argparse.Namespace) -> int:

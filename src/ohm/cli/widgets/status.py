@@ -4,7 +4,7 @@ import uuid
 from textual.widget import Widget
 from textual.app import RenderResult
 
-from ohm.utils.fake_data import FAKE_STATUS
+from ohm import __version__
 
 
 class StatusBar(Widget):
@@ -27,8 +27,6 @@ class StatusBar(Widget):
 
     def render(self) -> RenderResult:
         """Render the status bar."""
-        status = FAKE_STATUS
-
         # Current model from app state
         app = self.app
         model_name = getattr(app, "current_model_name", "Claude Sonnet 4")
@@ -43,6 +41,6 @@ class StatusBar(Widget):
 
         session_info = f"[bold cyan]Session:[/] [dim]{self._session_id}[/]"
         model_info = f"[bold cyan]Model:[/] [dim]{model_name}[/]"
-        system_info = f"[dim]v{status['version']}[/] | [dim]{status['memory_usage']}[/]"
+        system_info = f"[dim]v{__version__}[/]"
 
         return f" {' | '.join(key_hints)}  {session_info}  {model_info}  {system_info}"

@@ -5,7 +5,8 @@ from textual.reactive import reactive
 from textual.app import RenderResult
 from textual.binding import Binding
 
-from ohm.utils.fake_data import FAKE_PROVIDERS
+from ohm.core.config import get_config
+from ohm.core.provider import get_providers_ui_data
 
 
 class ModelSelector(Widget):
@@ -46,9 +47,15 @@ class ModelSelector(Widget):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.providers = FAKE_PROVIDERS
+        cfg = get_config()
+        self.providers = get_providers_ui_data(api_key_for=cfg.api_key_for)
         self._expanded: set[int] = {0}
         self._viewport_offset: int = 0
+
+    def refresh_providers(self) -> None:
+        """Reload provider list with current config/API keys."""
+        cfg = get_config()
+        self.providers = get_providers_ui_data(api_key_for=cfg.api_key_for)
 
     @property
     def _viewport_height(self) -> int:
@@ -148,6 +155,7 @@ class ModelSelector(Widget):
 
     def show(self) -> None:
         """Show the model selector and take focus."""
+        self.refresh_providers()
         self.add_class("-visible")
         self.selected_provider = 0
         self.selected_model = 0

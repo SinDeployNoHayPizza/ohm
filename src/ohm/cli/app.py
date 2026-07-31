@@ -31,7 +31,8 @@ from ohm.cli.themes.ocean import OHM_OCEAN
 from ohm.cli.themes.gruvbox import OHM_GRUVBOX
 from ohm.core.agent import Agent, AgentConfig
 from ohm.core.commands import CommandRegistry
-from ohm.utils.fake_data import FAKE_COMMANDS, FAKE_PROVIDERS
+from ohm.core.provider import resolve_context_window
+from ohm.utils.fake_data import FAKE_COMMANDS
 from ohm.commands.session import _gen_session_id, _save_session, _load_last_session
 
 
@@ -492,12 +493,7 @@ class OhmApp(App[None]):
 
     def _resolve_context_window(self, provider_name: str, model_id: str) -> int:
         """Look up context_window for a given provider/model ID."""
-        for p in FAKE_PROVIDERS:
-            if p["name"] == provider_name:
-                for m in p["models"]:
-                    if m["id"] == model_id:
-                        return m.get("context_window", 200000)
-        return 200000
+        return resolve_context_window(provider_name, model_id)
 
     def _on_model_selected(self, provider: dict, model: dict) -> None:
         """Called when a model is selected from the ModelSelector."""

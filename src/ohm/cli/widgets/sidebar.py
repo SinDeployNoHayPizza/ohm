@@ -5,17 +5,7 @@ from __future__ import annotations
 from textual.widget import Widget
 from textual.app import RenderResult
 
-# ── Provider display name resolution ──────────────────────────
-
-_PROVIDER_DISPLAY: dict[str, str] = {
-    "anthropic": "Anthropic",
-    "openai": "OpenAI",
-    "google": "Google Gemini",
-    "nvidia": "NVIDIA NIM",
-    "ollama": "Ollama",
-    "ollama-cloud": "Ollama Cloud",
-    "local": "Local (Ollama)",
-}
+from ohm.core.provider import PROVIDER_CATALOG
 
 
 class Sidebar(Widget):
@@ -37,7 +27,8 @@ class Sidebar(Widget):
         # ── Provider & model ────────────────────────────────────
         provider_name = getattr(self.app, "current_provider", "?")
         model_name = getattr(self.app, "current_model_name", "?")
-        display_name = _PROVIDER_DISPLAY.get(provider_name, provider_name.capitalize())
+        catalog = PROVIDER_CATALOG.get(provider_name)
+        display_name = catalog.display_name if catalog else provider_name.capitalize()
 
         # Check API key status
         config = getattr(self.app, "config", None)
