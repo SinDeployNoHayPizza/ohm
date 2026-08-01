@@ -320,8 +320,19 @@ class OhmApp(App[None]):
 
     # ── Hotkey Actions ──────────────────────────────────────
 
+    def _is_open(self, screen_type: type) -> bool:
+        """True when a screen of type ``screen_type`` is on the stack (R6).
+
+        Guards hotkey actions so a repeated press (F3/F2/Ctrl+K/settings/
+        quit) never stacks a second modal (DD-09).
+        """
+        return any(isinstance(screen, screen_type) for screen in self.screen_stack)
+
     def action_quit_ohm(self) -> None:
-        """Show quit confirmation dialog."""
+        """Show quit confirmation dialog (R6: never push a second one)."""
+        if self._is_open(QuitConfirm):
+            return
+
         def on_confirm(confirmed: bool | None) -> None:
             if confirmed:
                 self._session_data["theme"] = self.current_theme_name
@@ -428,13 +439,18 @@ class OhmApp(App[None]):
         self.notify(f"Skill {skill_name} loaded into chat", severity="info", timeout=3)
 
     def action_settings(self) -> None:
-        """Open settings modal."""
+        """Open settings modal (R6: never push a second one)."""
         from ohm.cli.screens.settings import SettingsModal
+        if self._is_open(SettingsModal):
+            return
         self.push_screen(SettingsModal())
 
     def action_session_browser(self) -> None:
-        """Open the session browser modal."""
+        """Open the session browser modal (R6: never push a second one)."""
         from ohm.cli.screens.session_browser import SessionBrowser
+        if self._is_open(SessionBrowser):
+            return
+
         def on_select(result: dict | None) -> None:
             if result is not None:
                 # Replay and continue from selected session

@@ -1,8 +1,11 @@
-"""Tests for the command palette filter (R5) and ModalMenu behavior."""
+"""Tests for the command palette filter (R5), ModalMenu behavior, and the
+modal single-toggle guard (R6)."""
 
 from textual.app import App
+from textual.screen import Screen
 from textual.widgets import Input, Static
 
+from ohm.cli.app import OhmApp
 from ohm.cli.widgets.modal_menu import ModalMenu
 from ohm.core.commands import CommandKind, PaletteEntry
 
@@ -116,3 +119,54 @@ class TestFilterInput:
             focused = app.focused
             assert isinstance(focused, Input)
             assert focused.id == "palette-filter"
+
+
+class _DummyModal(Screen[None]):
+    """A minimal modal screen type for guard tests."""
+
+
+class TestModalGuard:
+    """R6/DD-09: repeated hotkeys never push a second modal."""
+
+    @staticmethod
+    def _push_for_test(app: OhmApp, screen: Screen) -> None:
+        """Push a screen onto the live stack without running the app.
+
+        ``App.screen_stack`` returns a snapshot copy, so mutate the
+        backing list directly to simulate an open modal.
+        """
+        app._screen_stacks[app._current_mode].append(screen)
+
+    def test_is_open_reads_screen_stack(self):
+        app = OhmApp()
+        assert app._is_open(_DummyModal) is False
+        self._push_for_test(app, _DummyModal())
+        assert app._is_open(_DummyModal) is True
+
+    def test_f3_does_not_push_second_browser(self):
+        """GIVEN SessionBrowser is top screen WHEN F3 THEN stack unchanged."""
+        from ohm.cli.screens.session_browser import SessionBrowser
+
+        app = OhmApp()
+        self._push_for_test(app, SessionBrowser())
+        before = len(app.screen_stack)
+        app.action_session_browser()
+        assert len(app.screen_stack) == before
+
+    def test_settings_does_not_push_second_modal(self):
+        from ohm.cli.screens.settings import SettingsModal
+
+        app = OhmApp()
+        self._push_for_test(app, SettingsModal())
+        before = len(app.screen_stack)
+        app.action_settings()
+        assert len(app.screen_stack) == before
+
+    def test_quit_does_not_push_second_confirm(self):
+        from ohm.cli.app import QuitConfirm
+
+        app = OhmApp()
+        self._push_for_test(app, QuitConfirm())
+        before = len(app.screen_stack)
+        app.action_quit_ohm()
+        assert len(app.screen_stack) == before
