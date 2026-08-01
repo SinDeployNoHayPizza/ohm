@@ -1,9 +1,11 @@
 """OHM Modal Menu Widget - Command palette with filtering."""
 
-from textual.widget import Widget
-from textual.reactive import reactive
 from textual.app import RenderResult
 from textual.binding import Binding
+from textual.reactive import reactive
+from textual.widget import Widget
+from textual.widgets import Input, Static
+from textual import on
 
 from ohm.core.commands import PaletteEntry
 
@@ -11,8 +13,9 @@ from ohm.core.commands import PaletteEntry
 class ModalMenu(Widget):
     """Modal command palette with filtering, keyboard navigation, and scroll.
 
-    Renders the shared catalog produced by ``palette_entries`` (R2); the
-    app refreshes entries via :meth:`set_entries` before showing.
+    Renders the shared catalog produced by ``palette_entries`` (R2).  A
+    live filter ``Input`` narrows the visible list by name/description and
+    resets the selection to the first entry (R5/DD-10).
     """
 
     DEFAULT_CSS = """
@@ -29,6 +32,13 @@ class ModalMenu(Widget):
     }
     ModalMenu:focus {
         border: thick $accent;
+    }
+    ModalMenu Input {
+        margin-bottom: 1;
+    }
+    ModalMenu Static {
+        height: 1fr;
+        overflow-y: auto;
     }
     """
 
@@ -50,12 +60,15 @@ class ModalMenu(Widget):
         self.filtered_commands: list[PaletteEntry] = list(self._entries)
         self._viewport_offset: int = 0
 
+    def compose(self):
+        yield Input(placeholder="Filter commands...", id="palette-filter")
+        yield Static(id="command-list")
+
     def set_entries(self, entries: list[PaletteEntry]) -> None:
         """Replace the catalog and reset the palette state (R2)."""
         self._entries = list(entries)
-        self.filter_commands(self.filter_query)
+        self._apply_filter(self.filter_query)
         self._viewport_offset = 0
-        self.refresh()
 
     @property
     def _viewport_height(self) -> int:
@@ -66,8 +79,8 @@ class ModalMenu(Widget):
         h = self.size.height if self.size.height > 0 else 21
         return max(4, h - 6)
 
-    def render(self) -> RenderResult:
-        """Render the command list with scroll."""
+    def _render_list(self) -> None:
+        """Render the current filtered list into the Static list widget."""
         lines = []
         lines.append("[bold]OHM Commands[/]")
         lines.append("[dim]---[/]")
@@ -111,7 +124,38 @@ class ModalMenu(Widget):
 
         output.append("[dim]Up/Down Navigate | Enter Select | Esc Close[/]")
 
-        return "\n".join(output)
+        text = "\n".join(output)
+        try:
+            self.query_one("#command-list", expect_type=Static).update(text)
+        except Exception:
+            pass  # not mounted yet (unit tests exercise state directly)
+
+    def _apply_filter(self, query: str) -> None:
+        """Narrow the visible list by name/description; reset selection (R5).
+
+        Replaces the old dead ``filter_commands`` — it is wired to the
+        live ``Input#palette-filter`` via ``Input.Changed`` (DD-10).
+        """
+        self.filter_query = query
+        q = query.lower()
+        if not q:
+            self.filtered_commands = list(self._entries)
+        else:
+            self.filtered_commands = [
+                cmd for cmd in self._entries
+                if q in cmd.name.lower() or q in cmd.description.lower()
+            ]
+        self.selected_index = 0
+        self._viewport_offset = 0
+        self._render_list()
+
+    @on(Input.Changed, "#palette-filter")
+    def _on_filter_changed(self, event: Input.Changed) -> None:
+        self._apply_filter(event.value)
+
+    @on(Input.Submitted, "#palette-filter")
+    def _on_filter_submitted(self, event: Input.Submitted) -> None:
+        self.action_select()
 
     def show(self) -> None:
         """Show the modal menu."""
@@ -119,7 +163,21 @@ class ModalMenu(Widget):
         self.selected_index = 0
         self._viewport_offset = 0
         self.filtered_commands = list(self._entries)
-        self.focus()
+        try:
+            self.query_one("#palette-filter", expect_type=Input).value = ""
+        except Exception:
+            pass
+        self._render_list()
+        # Focus can't land on a display:none widget — defer until the
+        # -visible class has been laid out.
+        self.call_after_refresh(self._focus_filter)
+
+    def _focus_filter(self) -> None:
+        """Focus the filter Input (runs after the palette becomes visible)."""
+        try:
+            self.query_one("#palette-filter", expect_type=Input).focus()
+        except Exception:
+            self.focus()
 
     def hide(self) -> None:
         """Hide the modal menu."""
@@ -129,24 +187,11 @@ class ModalMenu(Widget):
     def is_shown(self) -> bool:
         return "-visible" in self.classes
 
-    def filter_commands(self, query: str) -> None:
-        """Filter commands based on query."""
-        self.filter_query = query
-        if not query:
-            self.filtered_commands = list(self._entries)
-        else:
-            self.filtered_commands = [
-                cmd for cmd in self._entries
-                if query.lower() in cmd.name.lower()
-                or query.lower() in cmd.description.lower()
-            ]
-        self.selected_index = 0
-        self._viewport_offset = 0
-
     def move_selection(self, delta: int) -> None:
         """Move selection up or down."""
         if self.filtered_commands:
             self.selected_index = (self.selected_index + delta) % len(self.filtered_commands)
+        self._render_list()
 
     def get_selected(self) -> PaletteEntry | None:
         """Get the currently selected command."""
