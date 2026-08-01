@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
-from ohm.core.skills.loader import SkillLoader
+from ohm.core.skills.loader import DEFAULT_SKILL_SEARCH_PATHS, SkillLoader
 from ohm.core.skills.registry import SkillRegistry
 
 
@@ -31,12 +30,8 @@ def handler(args: argparse.Namespace) -> int:
     """Execute `ohm skill` action."""
     action = getattr(args, "skill_action", "list") or "list"
 
-    search_paths = [
-        Path(".agents/skills"),
-        Path(".ohm/skills"),
-        Path.home() / ".ohm" / "skills",
-        Path.home() / ".gemini" / "skills",
-    ]
+    # DD-08: single source shared with the TUI (OhmApp.on_mount)
+    search_paths = DEFAULT_SKILL_SEARCH_PATHS()
 
     discovered = SkillLoader.discover_skills(search_paths)
     registry = SkillRegistry()

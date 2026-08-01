@@ -5,11 +5,15 @@ from textual.reactive import reactive
 from textual.app import RenderResult
 from textual.binding import Binding
 
-from ohm.utils.fake_data import FAKE_COMMANDS
+from ohm.core.commands import PaletteEntry
 
 
 class ModalMenu(Widget):
-    """Modal command palette with filtering, keyboard navigation, and scroll."""
+    """Modal command palette with filtering, keyboard navigation, and scroll.
+
+    Renders the shared catalog produced by ``palette_entries`` (R2); the
+    app refreshes entries via :meth:`set_entries` before showing.
+    """
 
     DEFAULT_CSS = """
     ModalMenu {
@@ -40,10 +44,18 @@ class ModalMenu(Widget):
     selected_index: reactive[int] = reactive(0)
     filter_query: reactive[str] = reactive("")
 
-    def __init__(self, **kwargs):
+    def __init__(self, entries: list[PaletteEntry] | None = None, **kwargs):
         super().__init__(**kwargs)
-        self.filtered_commands = FAKE_COMMANDS.copy()
+        self._entries: list[PaletteEntry] = list(entries or [])
+        self.filtered_commands: list[PaletteEntry] = list(self._entries)
         self._viewport_offset: int = 0
+
+    def set_entries(self, entries: list[PaletteEntry]) -> None:
+        """Replace the catalog and reset the palette state (R2)."""
+        self._entries = list(entries)
+        self.filter_commands(self.filter_query)
+        self._viewport_offset = 0
+        self.refresh()
 
     @property
     def _viewport_height(self) -> int:
@@ -62,9 +74,9 @@ class ModalMenu(Widget):
 
         for i, cmd in enumerate(self.filtered_commands):
             selected = "[bold cyan]>[/]" if i == self.selected_index else " "
-            hotkey = f" [dim]({cmd['hotkey']})[/]" if cmd.get("hotkey") else ""
+            hotkey = f" [dim]({cmd.hotkey})[/]" if cmd.hotkey else ""
             lines.append(
-                f"{selected} [bold cyan]{cmd['name']}[/] {cmd['description']}{hotkey}"
+                f"{selected} [bold cyan]{cmd.name}[/] {cmd.description}{hotkey}"
             )
 
         total = len(lines)
@@ -106,7 +118,7 @@ class ModalMenu(Widget):
         self.add_class("-visible")
         self.selected_index = 0
         self._viewport_offset = 0
-        self.filtered_commands = FAKE_COMMANDS.copy()
+        self.filtered_commands = list(self._entries)
         self.focus()
 
     def hide(self) -> None:
@@ -121,12 +133,12 @@ class ModalMenu(Widget):
         """Filter commands based on query."""
         self.filter_query = query
         if not query:
-            self.filtered_commands = FAKE_COMMANDS.copy()
+            self.filtered_commands = list(self._entries)
         else:
             self.filtered_commands = [
-                cmd for cmd in FAKE_COMMANDS
-                if query.lower() in cmd["name"].lower()
-                or query.lower() in cmd["description"].lower()
+                cmd for cmd in self._entries
+                if query.lower() in cmd.name.lower()
+                or query.lower() in cmd.description.lower()
             ]
         self.selected_index = 0
         self._viewport_offset = 0
@@ -136,7 +148,7 @@ class ModalMenu(Widget):
         if self.filtered_commands:
             self.selected_index = (self.selected_index + delta) % len(self.filtered_commands)
 
-    def get_selected(self) -> dict | None:
+    def get_selected(self) -> PaletteEntry | None:
         """Get the currently selected command."""
         if self.filtered_commands:
             return self.filtered_commands[self.selected_index]
@@ -166,19 +178,12 @@ class ModalMenu(Widget):
         self.move_selection(1)
 
     def action_select(self) -> None:
-        cmd = self.get_selected()
+        entry = self.get_selected()
         self.hide()
         try:
             self.app.query_one("#command-input").focus()
         except Exception as exc:
             self.app.notify(f"Focus return failed: {exc}", severity="warning")
-        if cmd:
-            key = cmd.get("key")
-            if key:
-                # Dispatch to a named action on the app
-                action_name = f"action_{key}"
-                action = getattr(self.app, action_name, None)
-                if action:
-                    action()
-                    return
-            self.app.notify(f"Command: {cmd['name']}", severity="info")
+        if entry:
+            # DD-12: single dispatch path shared with the / dropdown.
+            self.app._dispatch_command(entry)
