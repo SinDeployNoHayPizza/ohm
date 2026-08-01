@@ -39,14 +39,14 @@ Base chain: PR 1 base = feature/tui-command-unification; PR 2 base = PR 1 branch
 
 ## Slice 2: Widget Fixes (R4/R5/R6/R8)
 
-- [ ] 2.1 RED: `tests/cli/test_input.py` — headless: ctrl+j inserts `\n` without submit; ctrl+m submits as enter
-- [ ] 2.2 GREEN: `src/ohm/cli/widgets/input.py` `_on_key` — ctrl+m submit, ctrl+j `insert("\n")`; delete `get_filtered_commands`
-- [ ] 2.3 RED: `tests/cli/test_modal_menu.py` — `_apply_filter` narrows by name/description; resets index 0
-- [ ] 2.4 GREEN: `modal_menu.py` — `Input#palette-filter` + Static list; `Input.Changed → _apply_filter` (DD-10)
+- [x] 2.1 RED: `tests/cli/test_input.py` — headless: ctrl+j inserts `\n` without submit; ctrl+m submits as enter
+- [x] 2.2 GREEN: `src/ohm/cli/widgets/input.py` `_on_key` — ctrl+m submit, ctrl+j `insert("\n")`; delete `get_filtered_commands`
+- [x] 2.3 RED: `tests/cli/test_modal_menu.py` — `_apply_filter` narrows by name/description; resets index 0
+- [x] 2.4 GREEN: `modal_menu.py` — `Input#palette-filter` + Static list; `Input.Changed → _apply_filter` (DD-10)
 - [x] 2.5 RED: R6 — repeated F3 never pushes second modal; `_is_open` reads `screen_stack`
 - [x] 2.6 GREEN: `app.py` — `_is_open(T)` guard: toggle modals pop on repeat, push modals no-op (DD-09)
-- [ ] 2.7 RED: `tests/cli/test_model_selector.py` — right adds provider to `_expanded`; left removes (R8)
-- [ ] 2.8 GREEN: `model_selector.py` — left/right bindings → collapse/expand (DD-11)
+- [x] 2.7 RED: `tests/cli/test_model_selector.py` — right adds provider to `_expanded`; left removes (R8)
+- [x] 2.8 GREEN: `model_selector.py` — left/right bindings → collapse/expand (DD-11)
 
 ## Slice 3: FU-015 ModalScreen Conversion (R7)
 
