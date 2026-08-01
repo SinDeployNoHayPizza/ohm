@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.1.5 — 2026-07-31
+
+### Added
+
+- **Skills Registry & Loader**: `Skill` dataclass, `SkillLoader`, and `SkillRegistry`
+  in `src/ohm/core/skills/` — discovery from `~/.ohm/skills` and `.agents/skills`
+  with same-name priority override, manifest parsing, and enable/disable management.
+  (#skills-registry-loader)
+- **`ohm skill list` CLI command**: lists discovered skills with status, wired into
+  the command registry. (#skills-registry-loader)
+- **Follow-ups tracking**: `docs/follow-ups.md` documents known non-blocking issues
+  (FU-001..FU-008) so archived change warnings are not forgotten.
+
+### Changed
+
+- Roadmap: Skills registry marked done in Phase 2 — Core Engine.
+
 ## v0.1.3 — 2026-07-31
 
 ### Added
