@@ -18,6 +18,14 @@ Source of truth for archived-change follow-ups: `openspec/changes/archive/<date>
 | FU-006 | skills-registry-loader | SUGGESTION | Naming drift: `parse_skill_md()` (tasks.md 1.1) vs `parse_skill_file()` (code). | Rename to match, or update tasks/design. |
 | FU-007 | skills-registry-loader | SUGGESTION | Header-only `SKILL.md` handling wording vs design.md:7. | Align implementation or design wording. |
 | FU-008 | skills-registry-loader | SUGGESTION | `src/ohm/commands/skill.py:59-60` unknown-action branch untested. | Add CLI test for unknown subcommand. |
+| FU-009 | tui-command-unification (planned) | BUG | TUI and CLI command lists are not unified: some CLI commands have TUI counterparts (executed differently), others (version, CLI help) are TUI-irrelevant. Needs a guard test proving no command is lost. | Unify command list; keep CLI-only commands apart; add parity test. |
+| FU-010 | tui-command-unification (planned) | BUG | TUI has two command lists: Ctrl+P modal and `/`-prefixed input menu — they must show the same set (plus skills at the end of each listing). | Single source of truth for both surfaces. |
+| FU-011 | tui-command-unification (planned) | BUG | Evaluate Ctrl+J as `input_newline`: inserts a line break without confirming the input. | Confirm widget supports it; wire keybinding. |
+| FU-012 | tui-command-unification (planned) | BUG | Command modal has no filter/search input. | Add filter input to command modal. |
+| FU-013 | tui-command-unification (planned) | BUG | Pressing F3 multiple times doesn't close the modal (or stacks new modals) — requires same number of Esc presses. | Guard modal against re-open/stack; single-toggle behavior. |
+| FU-014 | tui-command-unification (planned) | BUG | Skills commands missing from the command modal and the `/` popup menu. | Register skills commands in both surfaces. |
+| FU-015 | tui-command-unification (planned) | BUG | Session modal is visually better (no opaque side dimming); apply the same visual style to model and command modals. | Align modal styling. |
+| FU-016 | tui-command-unification (planned) | BUG | Model modal lacks collapse/expand of branches (left/right arrow keys). | Add collapse/expand navigation. |
 
 ## Resolved
 
