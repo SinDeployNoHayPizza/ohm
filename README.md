@@ -555,7 +555,7 @@ interface:
 
 ### Phase 2 — Core Engine 🔄
 - [ ] Sandbox manager (gVisor / Docker)
-- [ ] Skills registry and loader (in progress)
+- [x] Skills registry and loader
 - [ ] Structured logging and metrics
 - [ ] MCP server implementation
 
