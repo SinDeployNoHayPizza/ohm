@@ -550,15 +550,15 @@ interface:
 
 ## Hoja de Ruta
 
-### Fase 1 — Fundación 🔄
+### Fase 1 — Fundación ✅
 - [x] Andamiaje del proyecto con Python 3.12+, UV, Ruff
 - [x] Integración de Strands Agents
 - [x] Interfaz CLI básica
-- [ ] Capa de abstracción de proveedores (en progreso)
+- [x] Capa de abstracción de proveedores
 
-### Fase 2 — Motor Core
+### Fase 2 — Motor Core 🔄
 - [ ] Administrador de sandbox (gVisor / Docker)
-- [ ] Registro y cargador de skills
+- [ ] Registro y cargador de skills (en progreso)
 - [ ] Registro estructurado y métricas
 - [ ] Implementación del servidor MCP
 
@@ -602,9 +602,10 @@ uv run ruff check .
 uvrun ruff format .
 ```
 
-### Decisiones de Arquitectura
+### Documentación e Integración
 
-Las decisiones de diseño significativas están documentadas en [docs/adr/](docs/adr/).
+- [Guía de Integración Engram & Gentle-AI](docs/engram-gentle-ai-integration.md)
+- Las decisiones de diseño significativas están documentadas en [docs/adr/](docs/adr/).
 
 ---
 

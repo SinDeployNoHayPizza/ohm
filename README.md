@@ -547,15 +547,15 @@ interface:
 
 ## Roadmap
 
-### Phase 1 — Foundation 🔄
+### Phase 1 — Foundation ✅
 - [x] Project scaffold with Python 3.12+, UV, Ruff
 - [x] Strands Agents integration
 - [x] Basic CLI interface
-- [ ] Provider abstraction layer (in progress)
+- [x] Provider abstraction layer
 
-### Phase 2 — Core Engine
+### Phase 2 — Core Engine 🔄
 - [ ] Sandbox manager (gVisor / Docker)
-- [ ] Skills registry and loader
+- [ ] Skills registry and loader (in progress)
 - [ ] Structured logging and metrics
 - [ ] MCP server implementation
 
@@ -599,9 +599,10 @@ uv run ruff check .
 uv run ruff format .
 ```
 
-### Architecture Decisions
+### Documentation & Integration
 
-Significant design decisions are documented in [docs/adr/](docs/adr/).
+- [Engram & Gentle-AI Integration Guide](docs/engram-gentle-ai-integration.md)
+- Significant design decisions are documented in [docs/adr/](docs/adr/).
 
 ---
 
