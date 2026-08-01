@@ -7,8 +7,6 @@ from textual.widgets import TextArea, Label, Button
 from textual.events import Resize, Key
 from textual import on
 
-from ohm.utils.fake_data import FAKE_COMMANDS
-
 
 class _SubmitTextArea(TextArea):
     """TextArea that submits on plain Enter.
@@ -131,15 +129,6 @@ class CommandInput(Widget):
             return
         textarea.text = ""
         self.app._handle_input_submit(text)
-
-    def get_filtered_commands(self, query: str) -> list[dict]:
-        """Filter commands based on query."""
-        if not query.startswith("/"):
-            return []
-        return [
-            cmd for cmd in FAKE_COMMANDS
-            if cmd["name"].startswith(query)
-        ]
 
     def get_file_preview(self, path: str) -> dict | None:
         """Get file preview for # file inclusion."""
