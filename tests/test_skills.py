@@ -57,3 +57,55 @@ class TestSkillRegistry:
         prompt = registry.build_system_prompt_context()
         assert "Demo Skill" in prompt
         assert "Do stuff" in prompt
+
+    def test_registry_enable_skill(self):
+        registry = SkillRegistry()
+        skill = Skill(name="demo", description="Demo Skill", path=Path("/fake"), instructions="Do stuff")
+        registry.register(skill)
+        registry.disable_skill("demo")
+        assert skill.enabled is False  # precondition: skill is disabled
+
+        assert registry.enable_skill("demo") is True
+        assert skill.enabled is True
+
+    def test_registry_enable_skill_unknown_name_returns_false(self):
+        registry = SkillRegistry()
+
+        assert registry.enable_skill("missing") is False
+
+    def test_registry_disable_skill(self):
+        registry = SkillRegistry()
+        skill = Skill(name="demo", description="Demo Skill", path=Path("/fake"), instructions="Do stuff")
+        registry.register(skill)
+        assert skill.enabled is True  # precondition: default is enabled
+
+        assert registry.disable_skill("demo") is True
+        assert skill.enabled is False
+
+    def test_registry_disable_skill_unknown_name_returns_false(self):
+        registry = SkillRegistry()
+
+        assert registry.disable_skill("missing") is False
+
+    def test_build_system_prompt_context_excludes_disabled_skills(self):
+        registry = SkillRegistry()
+        active = Skill(name="active", description="Active Skill", path=Path("/a"), instructions="Active body")
+        dormant = Skill(name="dormant", description="Dormant Skill", path=Path("/d"), instructions="Dormant body")
+        registry.register(active)
+        registry.register(dormant)
+        registry.disable_skill("dormant")
+
+        prompt = registry.build_system_prompt_context()
+        assert "Active Skill" in prompt
+        assert "Active body" in prompt
+        assert "dormant" not in prompt
+        assert "Dormant Skill" not in prompt
+        assert "Dormant body" not in prompt
+
+    def test_build_system_prompt_context_empty_when_all_disabled(self):
+        registry = SkillRegistry()
+        skill = Skill(name="solo", description="Solo Skill", path=Path("/s"), instructions="Solo body")
+        registry.register(skill)
+        registry.disable_skill("solo")
+
+        assert registry.build_system_prompt_context() == ""

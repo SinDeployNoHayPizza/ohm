@@ -260,3 +260,29 @@ class TestSkillCommand:
         assert "skill-b" in out
         assert "Skill A description" in out
         assert "Skill B description" in out
+
+    def test_skill_list_shows_disabled_status(self, tmp_path, monkeypatch, capsys):
+        """A disabled skill is listed with (disabled) status (skill.py:54 branch)."""
+        from ohm.core.skills.schema import Skill
+
+        disabled = Skill(
+            name="skill-a",
+            description="Skill A description",
+            path=tmp_path / "skill-a",
+            instructions="Body A",
+            enabled=False,
+        )
+        monkeypatch.setattr(
+            "ohm.commands.skill.SkillLoader.discover_skills",
+            staticmethod(lambda search_paths: {"skill-a": disabled}),
+        )
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+
+        from ohm.commands.skill import handler
+        code = handler(argparse.Namespace(skill_action="list"))
+        out = capsys.readouterr().out
+
+        assert code == 0
+        assert "Discovered Skills (1)" in out
+        assert "(disabled)" in out
