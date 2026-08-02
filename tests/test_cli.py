@@ -3,8 +3,6 @@
 import argparse
 from pathlib import Path
 
-import pytest
-
 from ohm.cli.registry import (
     Registry,
     ParsedResult,
@@ -81,31 +79,31 @@ class TestExitCodes:
 
 class TestCommands:
     def test_config_command_imports(self):
-        from ohm.commands.config import register, handler
+        from ohm.commands.config import handler
         assert callable(handler)
 
     def test_status_command_imports(self):
-        from ohm.commands.status import register, handler
+        from ohm.commands.status import handler
         assert callable(handler)
 
     def test_session_command_imports(self):
-        from ohm.commands.session import register, handler
+        from ohm.commands.session import handler
         assert callable(handler)
 
     def test_doctor_command_imports(self):
-        from ohm.commands.doctor import register, execute
+        from ohm.commands.doctor import execute
         assert callable(execute)
 
     def test_init_command_imports(self):
-        from ohm.commands.init import register, handler
+        from ohm.commands.init import handler
         assert callable(handler)
 
     def test_run_command_imports(self):
-        from ohm.commands.run import register, handler
+        from ohm.commands.run import handler
         assert callable(handler)
 
     def test_goal_command_imports(self):
-        from ohm.commands.goal import register, handler
+        from ohm.commands.goal import handler
         assert callable(handler)
 
     def test_session_continue_handler_imports(self):
@@ -153,7 +151,7 @@ class TestSessionSubcommand:
 
     def test_session_continue_subcommand_registered(self):
         """Verify the session command can route 'continue'."""
-        from ohm.commands.session import register, register_args, handler
+        from ohm.commands.session import register, register_args
         reg = Registry()
         register(reg)
         # Build temp parser to check sub-actions
@@ -261,6 +259,25 @@ class TestSkillCommand:
         assert "Skill A description" in out
         assert "Skill B description" in out
 
+    def test_skill_list_output_is_ascii_only(self, tmp_path, monkeypatch, capsys):
+        """FU-002: `ohm skill list` output uses only ASCII printable characters."""
+        skill_dir = tmp_path / ".agents" / "skills" / "skill-a"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: skill-a\ndescription: Skill A description\n---\nBody A",
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+
+        from ohm.commands.skill import handler
+        code = handler(argparse.Namespace(skill_action="list"))
+        out = capsys.readouterr().out
+
+        assert code == 0
+        assert "skill-a" in out  # listing ran — loop below is not a ghost loop
+        assert all(ord(ch) <= 0x7E for ch in out)
+
     def test_skill_list_shows_disabled_status(self, tmp_path, monkeypatch, capsys):
         """A disabled skill is listed with (disabled) status (skill.py:54 branch)."""
         from ohm.core.skills.schema import Skill
@@ -286,6 +303,58 @@ class TestSkillCommand:
         assert code == 0
         assert "Discovered Skills (1)" in out
         assert "(disabled)" in out
+
+    def test_skill_handler_unknown_action_returns_one(self, tmp_path, monkeypatch, capsys):
+        """FU-008: direct handler call with unknown action returns 1 (usage exit 2 untouched)."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+
+        from ohm.commands.skill import handler
+        code = handler(argparse.Namespace(skill_action="unknown"))
+        out = capsys.readouterr().out
+
+        assert code == 1
+        assert "Unknown skill action: unknown" in out
+
+
+class TestSkillInspectCommand:
+    """FU-001: `ohm skill inspect <name>` CLI sub-action."""
+
+    def test_skill_inspect_displays_skill_details(self, tmp_path, monkeypatch, capsys):
+        """Inspect prints name, description, absolute path, status, and instructions; exit 0."""
+        skill_dir = tmp_path / ".agents" / "skills" / "skill-a"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: skill-a\ndescription: Skill A description\n---\nBody A",
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+
+        from ohm.commands.skill import handler
+        code = handler(argparse.Namespace(skill_action="inspect", name="skill-a"))
+        out = capsys.readouterr().out
+
+        assert code == 0
+        assert "Skill: skill-a" in out
+        assert "Status: enabled" in out
+        assert "Description: Skill A description" in out
+        assert "Path:" in out
+        assert str((tmp_path / ".agents" / "skills" / "skill-a").resolve()) in out
+        assert "Instructions:" in out
+        assert "Body A" in out
+
+    def test_skill_inspect_unknown_returns_one(self, tmp_path, monkeypatch, capsys):
+        """Inspect of an unknown skill prints a not-found message and exits 1."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+
+        from ohm.commands.skill import handler
+        code = handler(argparse.Namespace(skill_action="inspect", name="bogus"))
+        out = capsys.readouterr().out
+
+        assert code == 1
+        assert "Skill not found: bogus" in out
 
 
 class TestCliTuiParity:

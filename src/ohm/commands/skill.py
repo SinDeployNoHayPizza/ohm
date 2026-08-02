@@ -25,6 +25,10 @@ def register_args(parser: argparse.ArgumentParser) -> None:
     # `ohm skill list`
     subparsers.add_parser("list", help="List discovered skills")
 
+    # `ohm skill inspect <name>`
+    inspect_parser = subparsers.add_parser("inspect", help="Inspect a skill")
+    inspect_parser.add_argument("name", help="Skill name")
+
 
 def handler(args: argparse.Namespace) -> int:
     """Execute `ohm skill` action."""
@@ -47,9 +51,24 @@ def handler(args: argparse.Namespace) -> int:
         print(f"Discovered Skills ({len(skills)}):\n")
         for s in skills:
             status = "enabled" if s.enabled else "disabled"
-            print(f"  • {s.name:<24} ({status}) — {s.description}")
+            print(f"  - {s.name:<24} ({status}) - {s.description}")
             print(f"    Path: {s.path}")
         return 0
+
+    if action == "inspect":
+        name = getattr(args, "name", "") or ""
+        skill = registry.get_skill(name)
+        if skill:
+            status = "enabled" if skill.enabled else "disabled"
+            print(f"Skill: {skill.name}")
+            print(f"Status: {status}")
+            print(f"Description: {skill.description}")
+            print(f"Path: {skill.path}")
+            print("Instructions:")
+            print(skill.instructions)
+            return 0
+        print(f"Skill not found: {name}")
+        return 1
 
     print(f"Unknown skill action: {action}")
     return 1
