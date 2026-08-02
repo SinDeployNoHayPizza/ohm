@@ -23,7 +23,6 @@ from ohm.cli.widgets.sidebar import Sidebar
 from ohm.cli.widgets.status import StatusBar
 from ohm.cli.widgets.progress import ContextProgress
 from ohm.cli.widgets.file_includer import FileIncluder
-from ohm.cli.widgets.model_selector import ModelSelector
 from ohm.cli.themes.default import OHM_DEFAULT
 from ohm.cli.themes.light import OHM_LIGHT
 from ohm.cli.themes.ocean import OHM_OCEAN
@@ -246,8 +245,6 @@ class OhmApp(App[None]):
         yield StatusBar()
         with Horizontal(id="file-includer-wrap"):
             yield FileIncluder(id="file-includer")
-        with Horizontal(id="model-selector-wrap"):
-            yield ModelSelector(id="model-selector")
 
     def on_mount(self) -> None:
         """Called when app is mounted. Replay continue session or restore."""
@@ -541,16 +538,24 @@ class OhmApp(App[None]):
         self.push_screen(ConfirmClear(), on_confirm)
 
     def action_model_selector(self) -> None:
-        """Open/close the model selector."""
-        selector = self.query_one("#model-selector")
-        if selector.is_shown:
-            selector.hide()
+        """Open/close the model selector modal (R6 toggle, DD-09).
+
+        The selector is a pushed ``ModelSelector(ModalScreen)`` (FU-015/R7).
+        A repeated F2 pops it.
+        """
+        from ohm.cli.widgets.model_selector import ModelSelector
+
+        if self._is_open(ModelSelector):
+            self.pop_screen()
+            return
+
+        def on_close(result: tuple[dict, dict] | None) -> None:
             try:
                 self.query_one("#command-input").focus()
             except Exception as exc:
                 self.notify(f"Focus return failed: {exc}", severity="warning")
-        else:
-            selector.show()
+
+        self.push_screen(ModelSelector(), on_close)
 
     def _resolve_context_window(self, provider_name: str, model_id: str) -> int:
         """Look up context_window for a given provider/model ID."""
