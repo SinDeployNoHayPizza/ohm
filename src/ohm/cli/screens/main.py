@@ -11,7 +11,6 @@ from ohm.cli.widgets.input import CommandInput
 from ohm.cli.widgets.sidebar import Sidebar
 from ohm.cli.widgets.status import StatusBar
 from ohm.cli.widgets.progress import ContextProgress
-from ohm.cli.widgets.modal_menu import ModalMenu
 from ohm.cli.widgets.file_includer import FileIncluder
 
 
@@ -49,5 +48,4 @@ class MainScreen(Screen):
                 yield CommandInput()
             yield Sidebar(id="sidebar")
         yield StatusBar()
-        yield ModalMenu(id="modal-menu")
         yield FileIncluder(id="file-includer")
