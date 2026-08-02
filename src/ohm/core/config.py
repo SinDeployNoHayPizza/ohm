@@ -50,6 +50,8 @@ DEFAULTS: dict[str, Any] = {
         "http_request", "think",
     ],
     "mcp": {},
+    "log_format": "text",
+    "metrics_enabled": True,
 }
 
 # Environment variable → config key mapping
@@ -60,6 +62,8 @@ _ENV_MAP: dict[str, str] = {
     "OHM_TEMPERATURE": "temperature",
     "OHM_SANDBOX": "sandbox",
     "OHM_LOG_LEVEL": "log_level",
+    "OHM_LOG_FORMAT": "log_format",
+    "OHM_METRICS_ENABLED": "metrics_enabled",
 }
 
 # API key env vars per provider
@@ -144,6 +148,8 @@ class OHMConfig:
     ])
     mcp: dict[str, Any] = field(default_factory=dict)
     log_level: str = "INFO"
+    log_format: str = "text"
+    metrics_enabled: bool = True
     base_url: str | None = None
 
     # Source tracking (which files were loaded)
@@ -194,6 +200,8 @@ class OHMConfig:
             "tools": self.tools,
             "mcp": self.mcp,
             "log_level": self.log_level,
+            "log_format": self.log_format,
+            "metrics_enabled": self.metrics_enabled,
             "base_url": self.base_url,
         }
 
@@ -245,10 +253,17 @@ def load_config(
                     merged[config_key] = float(env_value)
                 except ValueError:
                     pass
-            elif config_key in ("sandbox",):
+            elif config_key in ("sandbox", "metrics_enabled"):
                 merged[config_key] = env_value.lower() in ("true", "1", "yes")
             else:
                 merged[config_key] = env_value
+
+    # Validate log_format (PC-1/D3): invalid values fall back to "text"
+    log_format = merged.get("log_format", "text")
+    if log_format not in ("text", "json"):
+        logger.warning("Invalid log_format %r; falling back to 'text'", log_format)
+        log_format = "text"
+    merged["log_format"] = log_format
 
     return OHMConfig(
         provider=merged["provider"],
@@ -261,6 +276,8 @@ def load_config(
         tools=merged["tools"],
         mcp=merged.get("mcp", {}),
         log_level=merged.get("log_level", "INFO"),
+        log_format=log_format,
+        metrics_enabled=merged.get("metrics_enabled", True),
         base_url=merged.get("base_url"),
         global_config_path=gpath if gpath.exists() else None,
         project_config_path=ppath if ppath.exists() else None,

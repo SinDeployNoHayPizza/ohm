@@ -18,6 +18,8 @@ Source of truth for archived-change follow-ups: `openspec/changes/archive/<date>
 | FU-006 | skills-registry-loader | SUGGESTION | Naming drift: `parse_skill_md()` (tasks.md 1.1) vs `parse_skill_file()` (code). | Rename to match, or update tasks/design. |
 | FU-007 | skills-registry-loader | SUGGESTION | Header-only `SKILL.md` handling wording vs design.md:7. | Align implementation or design wording. |
 | FU-008 | skills-registry-loader | SUGGESTION | `src/ohm/commands/skill.py:59-60` unknown-action branch untested. | Add CLI test for unknown subcommand. |
+| FU-017 | structured-logging-metrics | SUGGESTION | `src/ohm/commands/run.py:48` echoes `[run] prompt: {args.prompt}` to stderr — prompt content visible on stderr under DEBUG sessions. Pre-existing UI print (not a log record; stdout purity unaffected; OBS-8 governs log records only). | Redact the prompt echo (log length/metadata only) in a future change. |
+| FU-018 | structured-logging-metrics | SUGGESTION | `ohm.metrics.cost.usd` is a fixed `0.0` slot — no cost data source in Stage 1 (OBS-7, D6). | Compute real cost from `PROVIDER_CATALOG` once pricing data exists (Stage 2). |
 
 ## Resolved
 

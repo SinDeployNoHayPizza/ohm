@@ -5,8 +5,6 @@ from __future__ import annotations
 import argparse
 import platform
 import shutil
-import sys
-from pathlib import Path
 
 
 def register_args(parser: argparse._ActionsContainer) -> None:
@@ -70,7 +68,7 @@ def handler(args: argparse.Namespace) -> int:
     # Strands availability
     strands_ok = False
     try:
-        import strands
+        import strands  # noqa: F401
         strands_ok = True
     except ImportError:
         pass
@@ -78,13 +76,14 @@ def handler(args: argparse.Namespace) -> int:
     # Textual availability
     textual_ok = False
     try:
-        import textual
+        import textual  # noqa: F401
         textual_ok = True
     except ImportError:
         pass
 
     if args.as_json:
         import json
+        from ohm.core.observability import get_metrics
         status = {
             "version": __version__,
             "python": python_version,
@@ -101,6 +100,7 @@ def handler(args: argparse.Namespace) -> int:
             "terminal": f"{terminal_cols}x{terminal_rows}",
             "strands": strands_ok,
             "textual": textual_ok,
+            "metrics": get_metrics().snapshot(),
         }
         print(json.dumps(status, indent=2))
     else:
@@ -122,7 +122,7 @@ def handler(args: argparse.Namespace) -> int:
             print(f"    {icon} {p}: {status}")
         print()
 
-        print(f"  Config:")
+        print("  Config:")
         print(f"    Global:  {'[ok]' if global_ok else '[--]'} {GLOBAL_CONFIG}")
         print(f"    Project: {'[ok]' if project_ok else '[--]'} {PROJECT_CONFIG}")
         print()

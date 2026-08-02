@@ -443,7 +443,7 @@ ohm.metrics.tokens.input     {model="gpt-4", provider="openai"} 1247
 ohm.metrics.tokens.output    {model="gpt-4", provider="openai"} 892
 ohm.metrics.latency.ms       {model="gpt-4", provider="openai"} 2340
 ohm.metrics.cost.usd         {model="gpt-4", provider="openai"} 0.089
-ohm.metrics.success           {model="gpt-4", provider="openai"} 1
+ohm.metrics.runs.success     {model="gpt-4", provider="openai"} 1
 ```
 
 ### Tracing
@@ -556,7 +556,7 @@ interface:
 ### Phase 2 — Core Engine 🔄
 - [ ] Sandbox manager (gVisor / Docker)
 - [x] Skills registry and loader
-- [ ] Structured logging and metrics
+- [x] Structured logging and metrics
 - [ ] MCP server implementation
 
 ### Phase 3 — Interoperability
