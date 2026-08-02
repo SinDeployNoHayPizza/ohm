@@ -9,9 +9,9 @@ scenarios: 10/10
 test_command: uv run pytest tests/ -q --junitxml=C:\Users\Admin\AppData\Local\Temp\opencode\ohm-followups-rem-ed-evidence.xml
 test_exit_code: 0
 test_output_hash: sha256:55882d3dd1060cf010c6b0e24db4a0a4d2fdf36a1fa9878b30154916e11b3760
-build_command: uv run python -m compileall src
+build_command: uv run python -m compileall -q src/ohm
 build_exit_code: 0
-build_output_hash: sha256:F100D952CEC2169A8273762B502679F2BC9177D48EECB72082455179FE230500
+build_output_hash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 ```
 
 ## Verification Report
@@ -33,7 +33,7 @@ build_output_hash: sha256:F100D952CEC2169A8273762B502679F2BC9177D48EECB720824551
 > Note: apply-progress prose says "14/14", but its own TDD Cycle Evidence table lists all 16 task rows and tasks.md has 16 checked boxes — a counting label mismatch in prose only, no evidence gap.
 
 ### Build & Tests Execution
-**Build**: ✅ Passed — `uv run python -m compileall src` → exit 0 (SHA-256 `F100D9…30500`). No packaging build tool configured; compileall is the build-equivalent check (same convention as the archived verify-report).
+**Build**: ✅ Passed — `uv run python -m compileall -q src/ohm` → exit 0 (empty output, SHA-256 `e3b0c4…855`). No packaging build tool configured; compileall is the build-equivalent check (same convention as the archived verify-report).
 
 **Tests**: ✅ **212 passed / 0 failed / 0 skipped** — `uv run pytest tests/ -q --junitxml=C:\Users\Admin\AppData\Local\Temp\opencode\ohm-followups-rem-ed-evidence.xml`, exit 0 (SHA-256 `55882D…3760`). JUnit parse: `tests=212 failures=0 errors=0 skipped=0`. Exactly matches apply-progress claim "212 passed (205 baseline + 7 new)". All 7 new tests + 1 renamed test confirmed present in the JUnit evidence and passing:
 `test_skill_inspect_displays_skill_details`, `test_skill_inspect_unknown_returns_one`, `test_skill_handler_unknown_action_returns_one`, `test_skill_list_output_is_ascii_only`, `test_discover_skills_path_is_absolute`, `test_discover_skills_priority_override_first_wins`, `test_parse_skill_file_header_only_falls_back_to_dirname`, `test_parse_skill_file_with_yaml_frontmatter` (renamed, FU-006).
