@@ -1,6 +1,7 @@
 # Provider Configuration Specification
 
 > **Status**: IMPLEMENTED & STABLE — synced from change `provider-abstraction-layer` (archived 2026-07-31). Verify verdict: PASS WITH WARNINGS; post-archive follow-ups tracked in Engram `sdd/provider-abstraction-layer/archive-report`.
+> Extended by change `structured-logging-metrics` (archived 2026-08-02): PC-1 Observability Configuration Keys merged (see `openspec/changes/archive/2026-08-02-structured-logging-metrics/archive-report.md`).
 
 ## Purpose
 
@@ -53,3 +54,25 @@ OHMConfig MUST expose `available_providers` listing providers with configured AP
 - GIVEN only ANTHROPIC_API_KEY and OPENAI_API_KEY are set
 - WHEN `available_providers` is queried
 - THEN it returns `["anthropic", "openai"]`
+
+### Requirement: Observability Configuration Keys (PC-1)
+
+OHMConfig MUST accept `log_format` (`text` default | `json`) and `metrics_enabled` (boolean, default `true`) keys, MUST apply the existing `log_level` at bootstrap, and MUST keep the `OHM_LOG_LEVEL` environment variable authoritative over the configured value.
+
+#### Scenario: Unset keys preserve behavior
+
+- GIVEN config without `log_format` or `metrics_enabled`
+- WHEN OHMConfig is loaded
+- THEN `log_format == "text"`, `metrics_enabled is True`, and prior logging behavior is unchanged
+
+#### Scenario: Env and json applied
+
+- GIVEN `OHM_LOG_LEVEL=DEBUG` and config `log_format: json`
+- WHEN OHMConfig is loaded and the CLI/TUI starts
+- THEN `log_level == "DEBUG"`, `log_format == "json"`, and the root logger applies both
+
+#### Scenario: Invalid log_format
+
+- GIVEN config `log_format: yaml`
+- WHEN OHMConfig is loaded
+- THEN `log_format` falls back to `"text"` and a warning is emitted
