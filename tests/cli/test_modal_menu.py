@@ -1,10 +1,12 @@
 """Tests for the command palette: live filter (R5), ModalScreen presentation
-(R7), selection contract (``dismiss(entry)``), and the modal single-toggle
-guard (R6/DD-09)."""
+(R7), selection contract (``dismiss(entry)``), the modal single-toggle
+guard (R6/DD-09), and palette `/` dropdown surface agreement (R2)."""
+
+import re
 
 from textual.app import App
 from textual.screen import ModalScreen
-from textual.widgets import Input, Static
+from textual.widgets import Input, Static, TextArea
 
 from ohm.cli.app import OhmApp
 from ohm.cli.widgets.modal_menu import CommandPalette
@@ -252,3 +254,75 @@ class TestModalGuard:
             await pilot.pause()
             assert not isinstance(app.screen, CommandPalette)
             assert len(app.screen_stack) == 1
+
+
+class TestSurfaceAgreement:
+    """R2 scenario "Palette and dropdown agree": both surfaces render the
+    same N entries in the same order from the single shared builder.
+
+    Renders BOTH surfaces through a real ``OhmApp`` (Ctrl+K palette pushed
+    from ``OhmApp._palette_entries()``; ``/`` dropdown rendered by
+    ``on_input_changed``) and asserts each surface's output equals the same
+    ``app._palette_entries()`` catalog — name/hotkey/action identity, not
+    merely "both use the builder".
+    """
+
+    @staticmethod
+    def _dropdown_signature(
+        text: str, names: list[str]
+    ) -> list[tuple[str, str | None]]:
+        """Map each rendered dropdown line to (name, hotkey).
+
+        Line format (app.py ``on_input_changed``): `` {name} {description}
+        ({hotkey})?``. The name is the catalog name the line starts with
+        (handles multi-word names like ``/session list``); the trailing
+        ``(hotkey)`` suffix is stripped when present.
+        """
+        lines = [
+            re.sub(r"\[[^\]]*\]", "", line).strip()
+            for line in text.splitlines()
+            if line.strip()
+        ]
+        signature = []
+        for line in lines:
+            name = next((n for n in names if line.startswith(n)), None)
+            assert name is not None, f"dropdown line not from catalog: {line!r}"
+            rest = line[len(name):].strip()
+            if rest.endswith(")") and " (" in rest:
+                _, _, hotkey = rest.rpartition(" (")
+                signature.append((name, hotkey.rstrip(")")))
+            else:
+                signature.append((name, None))
+        return signature
+
+    async def test_palette_and_dropdown_render_same_entries(self):
+        """GIVEN a catalog of N entries WHEN both surfaces are rendered
+        THEN both show the same N entries in the same order."""
+        app = OhmApp()
+        async with app.run_test() as pilot:
+            # ── Ctrl+K palette surface ──────────────────────────────
+            await pilot.press("ctrl+k")
+            await pilot.pause()
+            palette = app.screen
+            assert isinstance(palette, CommandPalette)
+
+            # ── / dropdown surface ──────────────────────────────────
+            await pilot.press("escape")
+            await pilot.pause()
+            app.query_one("#command-input", expect_type=TextArea).focus()
+            await pilot.pause()
+            await pilot.press("/")
+            await pilot.pause()
+            dropdown = app.query_one("#command-dropdown", expect_type=Static)
+            assert dropdown.styles.display == "block"
+
+            # The single shared catalog — one builder call for both.
+            catalog = app._palette_entries()
+            assert len(catalog) > 0  # the GIVEN catalog of N entries
+
+            # Palette renders exactly the catalog (same order, all fields).
+            assert palette.filtered_commands == catalog
+            # Dropdown renders the same N entries in the same order.
+            assert self._dropdown_signature(
+                str(dropdown.content), [e.name for e in catalog]
+            ) == [(e.name, e.hotkey) for e in catalog]
