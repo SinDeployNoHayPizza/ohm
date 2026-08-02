@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.1.6 — 2026-08-01
+
+### Added
+
+- **TUI command unification (slice 1 — catalog + parity + skills)**: `CommandRegistry`
+  is now the single source of truth for the Ctrl+K palette and `/` dropdown via a
+  pure `palette_entries(commands, skills)` builder; `CommandKind` enum
+  (REAL/DISPLAY_ONLY/TUI_IRRELEVANT), frozen `PaletteEntry`, and `CLI_TUI_MAPPING`
+  for the 15 CLI subcommands. Skills are discovered once and appended as
+  `/skill <name>` entries in both surfaces. (`#tui-command-unification`)
+- **CLI↔TUI parity guard test**: asserts every `register_all` subcommand maps to
+  exactly one class and none is lost. (`#tui-command-unification`)
+
+### Removed
+
+- Dead command sources: `GLOBAL_BINDINGS` (`src/ohm/cli/keybindings.py` deleted),
+  `FAKE_HOTKEYS`, and `FAKE_COMMANDS` retired from TUI UI paths. (`#tui-command-unification`)
+
 ## v0.1.5 — 2026-07-31
 
 ### Added
