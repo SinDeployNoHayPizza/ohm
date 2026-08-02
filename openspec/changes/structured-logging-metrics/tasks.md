@@ -59,5 +59,5 @@ Chain strategy: size-exception
 
 ## Phase 5: Docs & Verification
 
-- [ ] 5.1 F4 — `README.md:446` + `README.es.md:449`: rename `ohm.metrics.success` → `ohm.metrics.runs.success`; confirm remaining names match design
-- [ ] 5.2 Verify — `uv run pytest` full suite green; `uv run ohm doctor --json` shows metrics; stdout purity regression passes
+- [x] 5.1 F4 — `README.md:446` + `README.es.md:449`: rename `ohm.metrics.success` → `ohm.metrics.runs.success`; confirm remaining names match design
+- [x] 5.2 Verify — `uv run pytest` full suite green (236); `uv run ohm doctor --json` shows metrics; stdout purity regression passes

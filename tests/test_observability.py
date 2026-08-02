@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from ohm.core.agent import Agent, AgentConfig, AgentResponse
+from ohm.core.agent import Agent, AgentConfig
 from ohm.core.config import OHMConfig, _save_yaml, load_config
 from ohm.core.observability import JSONFormatter, get_metrics, setup_logging
 from ohm.core.provider import FallbackProvider, Provider, ProviderConfig, ProviderStatus, retry

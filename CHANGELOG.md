@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.1.10 — 2026-08-02
+
+### Added
+
+- **Structured logging bootstrap**: `setup_logging(cfg)` in the new
+  `src/ohm/core/observability.py` applies `log_level` (previously parsed but
+  dead) and an optional `log_format=json` `JSONFormatter` (timestamp/level/
+  logger/message allowlist), wired at the CLI entry point — logs go to stderr
+  only, keeping `ohm run` stdout clean. (`#structured-logging-metrics`)
+- **In-process metrics registry**: thread-safe `MetricsRegistry` singleton
+  accumulating `ohm.metrics.*` counters and histograms
+  (`runs.{success,failure}`, `tokens.{total,input,output}`, `cycles.total`,
+  `tools.calls`/`tools.{name}`, `latency.ms`, `provider.retry.attempts`,
+  `provider.transient.{429,503,5xx}`, `provider.failover`, `cost.usd`),
+  honoring `metrics_enabled: false` and the `OHM_METRICS_ENABLED` env var.
+  (`#structured-logging-metrics`)
+- **Agent/provider telemetry**: `Agent.run`/`stream` and `Provider.retry`/
+  `FallbackProvider` record run, token, tool, retry and failover metrics;
+  instrumentation never raises or alters results. (`#structured-logging-metrics`)
+- **CLI JSON surfaces**: `ohm doctor --json` and `ohm status --json` include a
+  nested `metrics` snapshot section. (`#structured-logging-metrics`)
+
+### Changed
+
+- **Metric name alignment**: README metric example renamed
+  `ohm.metrics.success` → `ohm.metrics.runs.success` to match the implemented
+  naming. (`#structured-logging-metrics`)
+
 ## v0.1.9 — 2026-08-02
 
 ### Added

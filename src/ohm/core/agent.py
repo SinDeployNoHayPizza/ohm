@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import sys
 import time
 import warnings
@@ -72,7 +71,6 @@ def _resolve_model(provider: str, model_id: str | None) -> Any:
         stacklevel=2,
     )
     from ohm.core.config import OHMConfig
-    from ohm.core.provider import create_provider
 
     provider_key = provider.lower()
     ohm_cfg = OHMConfig(provider=provider_key, model=model_id or "")
