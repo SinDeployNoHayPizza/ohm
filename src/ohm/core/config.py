@@ -253,7 +253,7 @@ def load_config(
                     merged[config_key] = float(env_value)
                 except ValueError:
                     pass
-            elif config_key in ("sandbox",):
+            elif config_key in ("sandbox", "metrics_enabled"):
                 merged[config_key] = env_value.lower() in ("true", "1", "yes")
             else:
                 merged[config_key] = env_value

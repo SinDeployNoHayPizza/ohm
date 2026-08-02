@@ -37,11 +37,11 @@ Chain strategy: size-exception
 
 ## Phase 2: S2 — Metrics Registry (OBS-4, OBS-7)
 
-- [ ] 2.1 RED — `TestMetricsRegistry`: accumulate; snapshot `{enabled,counters,histograms,cost}` with `cost.usd == 0.0` (OBS-7)
-- [ ] 2.2 RED — F2/OBS-4: `metrics_enabled: false` → records nothing, snapshot `{}` (disabled registry)
-- [ ] 2.3 RED — `reset()` clears; broken internals never raise (D5)
-- [ ] 2.4 GREEN — `observability.py`: Lock-guarded `MetricsRegistry` (increment/record_histogram/reset/snapshot, swallows internal errors) + `get_metrics()`; `setup_logging` sets module `_enabled` flag from `cfg.metrics_enabled`
-- [ ] 2.5 GREEN — `config.py`: `metrics_enabled: bool = True` field (D2) + `to_dict`; `_ENV_MAP` += `OHM_METRICS_ENABLED` with sandbox-style bool coercion (F3: config.py:248-249 pattern)
+- [x] 2.1 RED — `TestMetricsRegistry`: accumulate; snapshot `{enabled,counters,histograms,cost}` with `cost.usd == 0.0` (OBS-7)
+- [x] 2.2 RED — F2/OBS-4: `metrics_enabled: false` → records nothing, snapshot `{}` (disabled registry)
+- [x] 2.3 RED — `reset()` clears; broken internals never raise (D5)
+- [x] 2.4 GREEN — `observability.py`: Lock-guarded `MetricsRegistry` (increment/record_histogram/reset/snapshot, swallows internal errors) + `get_metrics()`; `setup_logging` sets module `_enabled` flag from `cfg.metrics_enabled`
+- [x] 2.5 GREEN — `config.py`: `metrics_enabled: bool = True` field (D2) + `to_dict`; `_ENV_MAP` += `OHM_METRICS_ENABLED` with sandbox-style bool coercion (F3: config.py:248-249 pattern)
 
 ## Phase 3: S3 — Instrumentation (OBS-5, OBS-6)
 

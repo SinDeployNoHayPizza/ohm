@@ -18,8 +18,18 @@ import pytest
 
 from ohm.core.agent import Agent, AgentConfig, AgentResponse
 from ohm.core.config import OHMConfig, _save_yaml, load_config
-from ohm.core.observability import JSONFormatter, setup_logging
+from ohm.core.observability import JSONFormatter, get_metrics, setup_logging
 from ohm.commands.run import _handle_run
+
+
+@pytest.fixture(autouse=True)
+def _clean_registry() -> None:
+    """Isolate the metrics registry and root logger between tests."""
+    setup_logging(OHMConfig())
+    get_metrics().reset()
+    yield
+    get_metrics().reset()
+    setup_logging(OHMConfig())
 
 
 def _no_files(tmp_path) -> tuple[Path, Path, Path]:
@@ -158,3 +168,67 @@ class TestJsonFormatterAllowlist:
         data = json.loads(out)
         assert set(data) == {"timestamp", "level", "logger", "message"}
         assert "prompt" not in out
+
+
+class TestMetricsRegistry:
+    """S2: OBS-4 (accumulate/disabled), OBS-7 (cost slot), D5 (isolation)."""
+
+    def test_accumulate_snapshot_shape(self):
+        """OBS-4/OBS-7: counters + histograms accumulate; cost.usd is 0.0."""
+        m = get_metrics()
+        m.increment("ohm.metrics.runs.success")
+        m.increment("ohm.metrics.tokens.total", 100)
+        m.record_histogram("ohm.metrics.latency.ms", 250.5)
+        m.record_histogram("ohm.metrics.latency.ms", 150.25)
+        snap = m.snapshot()
+        assert snap["enabled"] is True
+        assert snap["counters"]["ohm.metrics.runs.success"] == 1
+        assert snap["counters"]["ohm.metrics.tokens.total"] == 100
+        hist = snap["histograms"]["ohm.metrics.latency.ms"]
+        assert hist["count"] == 2
+        assert hist["sum"] == 400.75
+        assert hist["min"] == 150.25
+        assert hist["max"] == 250.5
+        assert hist["avg"] == 200.375
+        assert snap["cost"]["usd"] == 0.0
+
+    def test_disabled_records_nothing_snapshot_empty(self):
+        """OBS-4: metrics_enabled=false → records nothing, snapshot {}."""
+        setup_logging(OHMConfig(metrics_enabled=False))
+        m = get_metrics()
+        m.increment("ohm.metrics.runs.success")
+        m.record_histogram("ohm.metrics.latency.ms", 10.0)
+        assert m.snapshot() == {}
+
+    def test_metrics_enabled_env_var_coerces_bool(self, tmp_path):
+        """Task 2.5/F3: OHM_METRICS_ENABLED uses sandbox-style bool coercion."""
+        os.environ["OHM_METRICS_ENABLED"] = "false"
+        cfg = load_config(*_no_files(tmp_path))
+        assert cfg.metrics_enabled is False
+        os.environ["OHM_METRICS_ENABLED"] = "1"
+        cfg = load_config(*_no_files(tmp_path))
+        assert cfg.metrics_enabled is True
+
+    def test_reset_clears(self):
+        """Task 2.3: reset() clears all accumulated counters and histograms."""
+        m = get_metrics()
+        m.increment("ohm.metrics.runs.success")
+        m.record_histogram("ohm.metrics.latency.ms", 1.0)
+        m.reset()
+        snap = m.snapshot()
+        assert snap["counters"] == {}
+        assert snap["histograms"] == {}
+
+    def test_broken_internals_never_raise(self):
+        """D5: registry swallows internal errors — call sites never propagate."""
+
+        class Unhashable:
+            def __hash__(self) -> int:
+                raise RuntimeError("boom")
+
+        m = get_metrics()
+        m.increment(Unhashable())  # must not raise
+        m.record_histogram(Unhashable(), 1.0)  # must not raise
+        snap = m.snapshot()
+        assert snap["counters"] == {}
+        assert snap["histograms"] == {}
