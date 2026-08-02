@@ -85,6 +85,7 @@ def handler(args: argparse.Namespace) -> int:
 
     if args.as_json:
         import json
+        from ohm.core.observability import get_metrics
         status = {
             "version": __version__,
             "python": python_version,
@@ -101,6 +102,7 @@ def handler(args: argparse.Namespace) -> int:
             "terminal": f"{terminal_cols}x{terminal_rows}",
             "strands": strands_ok,
             "textual": textual_ok,
+            "metrics": get_metrics().snapshot(),
         }
         print(json.dumps(status, indent=2))
     else:

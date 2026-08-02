@@ -153,11 +153,13 @@ def execute(args: argparse.Namespace) -> int:
 
     if args.json:
         import json
+        from ohm.core.observability import get_metrics
         result = {
             "checks": [
                 {"status": status, "message": msg}
                 for status, msg in checks
-            ]
+            ],
+            "metrics": get_metrics().snapshot(),
         }
         print(json.dumps(result, indent=2))
         return 0

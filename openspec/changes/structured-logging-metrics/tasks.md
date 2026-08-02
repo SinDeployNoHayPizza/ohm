@@ -52,10 +52,10 @@ Chain strategy: size-exception
 
 ## Phase 4: S4 — CLI Surfaces (OBS-9, OBS-3)
 
-- [ ] 4.1 RED — `TestCliMetricsJson`: doctor/status `--json` include nested `metrics`, populated + empty-zero (OBS-9, D4)
-- [ ] 4.2 RED — `TestStdoutPurity` (CRITICAL): `_handle_run` with fake agent, json+DEBUG → stdout == response, stderr JSON lines (OBS-3)
-- [ ] 4.3 GREEN — `doctor.py`: add `metrics: snapshot()` to `--json` result (line ~154-162)
-- [ ] 4.4 GREEN — `status.py`: add `metrics: snapshot()` to `--json` result (line ~86-105)
+- [x] 4.1 RED — `TestCliMetricsJson`: doctor/status `--json` include nested `metrics`, populated + empty-zero (OBS-9, D4)
+- [x] 4.2 RED — `TestStdoutPurity` (CRITICAL): `_handle_run` with fake agent, json+DEBUG → stdout == response, stderr JSON lines (OBS-3)
+- [x] 4.3 GREEN — `doctor.py`: add `metrics: snapshot()` to `--json` result (line ~154-162)
+- [x] 4.4 GREEN — `status.py`: add `metrics: snapshot()` to `--json` result (line ~86-105)
 
 ## Phase 5: Docs & Verification
 

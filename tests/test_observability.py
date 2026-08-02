@@ -20,6 +20,8 @@ from ohm.core.agent import Agent, AgentConfig, AgentResponse
 from ohm.core.config import OHMConfig, _save_yaml, load_config
 from ohm.core.observability import JSONFormatter, get_metrics, setup_logging
 from ohm.core.provider import FallbackProvider, Provider, ProviderConfig, ProviderStatus, retry
+from ohm.commands import doctor as doctor_cmd
+from ohm.commands import status as status_cmd
 from ohm.commands.run import _handle_run
 
 
@@ -390,3 +392,67 @@ class TestProviderMetrics:
         assert result["content"] == "from secondary"
         snap = get_metrics().snapshot()
         assert snap["counters"]["ohm.metrics.provider.failover"] == 1
+
+
+class TestCliMetricsJson:
+    """S4: OBS-9 — doctor/status --json expose a nested ``metrics`` section."""
+
+    def test_doctor_json_includes_populated_metrics(self, capsys):
+        """OBS-9: doctor --json shows recorded metrics."""
+        get_metrics().increment("ohm.metrics.runs.success", 2)
+        get_metrics().record_histogram("ohm.metrics.latency.ms", 12.5)
+        rc = doctor_cmd.execute(argparse.Namespace(json=True))
+        assert rc == 0
+        out = json.loads(capsys.readouterr().out)
+        assert "metrics" in out
+        assert out["metrics"]["counters"]["ohm.metrics.runs.success"] == 2
+        assert out["metrics"]["histograms"]["ohm.metrics.latency.ms"]["count"] == 1
+        assert out["metrics"]["cost"] == {"usd": 0.0}
+
+    def test_doctor_json_metrics_empty_when_nothing_recorded(self, capsys):
+        """OBS-9: metrics section present and empty-zero by default."""
+        rc = doctor_cmd.execute(argparse.Namespace(json=True))
+        assert rc == 0
+        out = json.loads(capsys.readouterr().out)
+        assert "metrics" in out
+        assert out["metrics"]["counters"] == {}
+        assert out["metrics"]["histograms"] == {}
+
+    def test_status_json_includes_metrics_section(self, capsys):
+        """OBS-9: status --json exposes the same nested metrics section."""
+        get_metrics().increment("ohm.metrics.provider.failover", 1)
+        rc = status_cmd.handler(argparse.Namespace(as_json=True))
+        assert rc == 0
+        out = json.loads(capsys.readouterr().out)
+        assert "metrics" in out
+        assert out["metrics"]["counters"]["ohm.metrics.provider.failover"] == 1
+        assert "enabled" in out["metrics"]
+
+
+class TestStdoutPurity:
+    """S4: OBS-3 (CRITICAL) — run output goes to stdout, logs to stderr."""
+
+    def test_run_stdout_contains_only_response(self, capsys):
+        """OBS-3: json+DEBUG — stdout is exactly the response; logs on stderr."""
+        setup_logging(OHMConfig(log_level="DEBUG", log_format="json"))
+
+        def fake_call(prompt):
+            logging.getLogger("ohm.core.agent").debug("inner-trace record")
+            return TestAgentMetrics._fake_result(80, 1, {})
+
+        agent = Agent(AgentConfig())
+        agent._ensure_agent = lambda: fake_call
+
+        rc = _handle_run(agent, "hello")
+        captured = capsys.readouterr()
+        assert rc == 0
+        # Purity: nothing but the response content on stdout
+        assert captured.out.strip() == "ok"
+        # Logs went to stderr as parseable JSON lines
+        json_lines = [
+            json.loads(line)
+            for line in captured.err.splitlines()
+            if line.lstrip().startswith("{")
+        ]
+        messages = [line["message"] for line in json_lines]
+        assert "inner-trace record" in messages
