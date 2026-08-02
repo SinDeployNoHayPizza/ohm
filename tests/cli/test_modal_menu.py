@@ -1,12 +1,13 @@
-"""Tests for the command palette filter (R5), ModalMenu behavior, and the
-modal single-toggle guard (R6)."""
+"""Tests for the command palette: live filter (R5), ModalScreen presentation
+(R7), selection contract (``dismiss(entry)``), and the modal single-toggle
+guard (R6/DD-09)."""
 
 from textual.app import App
-from textual.screen import Screen
+from textual.screen import ModalScreen
 from textual.widgets import Input, Static
 
 from ohm.cli.app import OhmApp
-from ohm.cli.widgets.modal_menu import ModalMenu
+from ohm.cli.widgets.modal_menu import CommandPalette
 from ohm.core.commands import CommandKind, PaletteEntry
 
 
@@ -22,21 +23,42 @@ def _entry(name: str, description: str = "desc", *, action: str | None = None) -
 
 
 class _PaletteHarness(App[None]):
-    """Minimal app hosting a visible ModalMenu for headless typing."""
+    """Minimal app that pushes a CommandPalette for headless interaction."""
 
     def __init__(self, entries: list[PaletteEntry]) -> None:
         super().__init__()
         self.entries = entries
 
     def compose(self):
-        yield ModalMenu(id="menu", entries=self.entries)
+        yield Static(id="app-behind")
+
+    def on_mount(self) -> None:
+        self.push_screen(CommandPalette(self.entries))
+
+
+class _SelectionHarness(App[None]):
+    """App capturing the palette's ``dismiss(entry)`` result via callback."""
+
+    def __init__(self, entries: list[PaletteEntry]) -> None:
+        super().__init__()
+        self.entries = entries
+        self.selected: PaletteEntry | None = "sentinel"
+
+    def compose(self):
+        yield Static(id="app-behind")
+
+    def on_mount(self) -> None:
+        self.push_screen(CommandPalette(self.entries), self._on_select)
+
+    def _on_select(self, entry: PaletteEntry | None) -> None:
+        self.selected = entry
 
 
 class TestApplyFilter:
     """R5/DD-10: typing narrows by name/description and resets selection."""
 
-    def _menu(self) -> ModalMenu:
-        return ModalMenu(entries=[
+    def _menu(self) -> CommandPalette:
+        return CommandPalette(entries=[
             _entry("/sessions", "Browse saved sessions"),
             _entry("/session list", "Browse saved sessions"),
             _entry("/clear", "Clear chat history"),
@@ -96,32 +118,79 @@ class TestFilterInput:
             _entry("/theme", "Change theme"),
         ])
         async with app.run_test() as pilot:
-            menu = app.query_one("#menu", expect_type=ModalMenu)
-            menu.show()
+            pal = app.screen
             await pilot.press("s", "e", "s", "s")
 
-            assert [e.name for e in menu.filtered_commands] == [
+            assert [e.name for e in pal.filtered_commands] == [
                 "/sessions", "/session list",
             ]
-            assert menu.selected_index == 0
+            assert pal.selected_index == 0
             # The visible list re-renders into the Static widget.
-            list_text = menu.query_one("#command-list", expect_type=Static).content
+            list_text = pal.query_one("#command-list", expect_type=Static).content
             assert "/sessions" in str(list_text)
             assert "/clear" not in str(list_text)
 
-    async def test_filter_input_focused_when_shown(self):
+    async def test_filter_input_focused_when_pushed(self):
         app = _PaletteHarness(entries=[_entry("/run", "Execute a prompt")])
         async with app.run_test() as pilot:
-            menu = app.query_one("#menu", expect_type=ModalMenu)
-            menu.show()
-            await pilot.pause()
             await pilot.pause()
             focused = app.focused
             assert isinstance(focused, Input)
             assert focused.id == "palette-filter"
 
 
-class _DummyModal(Screen[None]):
+class TestModalScreenPresentation:
+    """R7/DD-03: palette renders as a ModalScreen dialog — the app behind is
+    dimmed (inherited ModalScreen backdrop) and the dialog is centered."""
+
+    async def test_palette_is_modal_screen_with_dim_and_centered_dialog(self):
+        app = _PaletteHarness(entries=[
+            _entry("/run", "Execute a prompt"),
+            _entry("/status", "Show status"),
+        ])
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            pal = app.screen
+            # Modal contract: ModalScreen subclass with the modal flag set.
+            assert isinstance(pal, ModalScreen)
+            assert pal._modal is True
+            # Dim: the inherited ModalScreen DEFAULT_CSS applies a translucent
+            # backdrop so the app behind shows through dimmed.
+            alpha = pal.styles.background.a
+            assert 0.0 < alpha < 1.0
+            # Centered: the dialog box is centered within the screen.
+            dlg = pal.query_one("#palette-dialog")
+            assert dlg.region.x == (pal.region.width - dlg.region.width) // 2
+            assert dlg.region.y == (pal.region.height - dlg.region.height) // 2
+
+
+class TestSelectionContract:
+    """``dismiss(entry)``: Enter returns the chosen entry, Escape cancels."""
+
+    async def test_enter_dismisses_with_selected_entry(self):
+        app = _SelectionHarness(entries=[
+            _entry("/run", "Execute a prompt", action="run"),
+            _entry("/status", "Show status"),
+        ])
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+            assert app.selected is not None
+            assert app.selected.name == "/run"
+            assert not isinstance(app.screen, CommandPalette)
+
+    async def test_escape_dismisses_with_none(self):
+        app = _SelectionHarness(entries=[_entry("/run", "Execute a prompt")])
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("escape")
+            await pilot.pause()
+            assert app.selected is None
+            assert not isinstance(app.screen, CommandPalette)
+
+
+class _DummyModal(ModalScreen[None]):
     """A minimal modal screen type for guard tests."""
 
 
@@ -129,7 +198,7 @@ class TestModalGuard:
     """R6/DD-09: repeated hotkeys never push a second modal."""
 
     @staticmethod
-    def _push_for_test(app: OhmApp, screen: Screen) -> None:
+    def _push_for_test(app: OhmApp, screen: ModalScreen) -> None:
         """Push a screen onto the live stack without running the app.
 
         ``App.screen_stack`` returns a snapshot copy, so mutate the
@@ -170,3 +239,16 @@ class TestModalGuard:
         before = len(app.screen_stack)
         app.action_quit_ohm()
         assert len(app.screen_stack) == before
+
+    async def test_ctrl_k_toggles_palette(self):
+        """R6: Ctrl+K opens the palette; a repeated Ctrl+K pops it (no stack)."""
+        app = OhmApp()
+        async with app.run_test() as pilot:
+            await pilot.press("ctrl+k")
+            await pilot.pause()
+            assert isinstance(app.screen, CommandPalette)
+            assert len(app.screen_stack) == 2
+            await pilot.press("ctrl+k")
+            await pilot.pause()
+            assert not isinstance(app.screen, CommandPalette)
+            assert len(app.screen_stack) == 1

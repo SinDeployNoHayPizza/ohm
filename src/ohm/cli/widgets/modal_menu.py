@@ -1,48 +1,48 @@
-"""OHM Modal Menu Widget - Command palette with filtering."""
+"""OHM Command Palette - ModalScreen-based command palette with filtering."""
 
-from textual.app import RenderResult
-from textual.binding import Binding
-from textual.reactive import reactive
-from textual.widget import Widget
-from textual.widgets import Input, Static
 from textual import on
+from textual.app import ComposeResult
+from textual.binding import Binding
+from textual.containers import Vertical
+from textual.reactive import reactive
+from textual.screen import ModalScreen
+from textual.widgets import Input, Static
 
 from ohm.core.commands import PaletteEntry
 
 
-class ModalMenu(Widget):
-    """Modal command palette with filtering, keyboard navigation, and scroll.
+class CommandPalette(ModalScreen[PaletteEntry | None]):
+    """Modal command palette with filtering (R7/DD-03).
 
-    Renders the shared catalog produced by ``palette_entries`` (R2).  A
-    live filter ``Input`` narrows the visible list by name/description and
-    resets the selection to the first entry (R5/DD-10).
+    Renders the shared catalog produced by ``palette_entries`` (R2).  A live
+    filter ``Input`` narrows the visible list by name/description and resets
+    the selection to the first entry (R5/DD-10).
+
+    Presentation (R7): inherits ``ModalScreen.DEFAULT_CSS`` so the app behind
+    is dimmed; the subclass CSS centers the dialog.  Selecting an entry
+    dismisses the screen with it via the ``dismiss(entry)`` contract — the
+    ``push_screen`` callback in the app dispatches the chosen entry (DD-12).
     """
 
-    DEFAULT_CSS = """
-    ModalMenu {
+    CSS = """
+    CommandPalette {
+        align: center middle;
+    }
+    #palette-dialog {
         width: 60;
-        height: 25;
+        height: 20;
         background: $surface;
         border: thick $primary;
         padding: 1 2;
-        display: none;
     }
-    ModalMenu.-visible {
-        display: block;
-    }
-    ModalMenu:focus {
-        border: thick $accent;
-    }
-    ModalMenu Input {
+    CommandPalette Input {
         margin-bottom: 1;
     }
-    ModalMenu Static {
+    CommandPalette Static {
         height: 1fr;
         overflow-y: auto;
     }
     """
-
-    can_focus = True
 
     BINDINGS = [
         Binding("escape", "close", "Close"),
@@ -60,23 +60,30 @@ class ModalMenu(Widget):
         self.filtered_commands: list[PaletteEntry] = list(self._entries)
         self._viewport_offset: int = 0
 
-    def compose(self):
-        yield Input(placeholder="Filter commands...", id="palette-filter")
-        yield Static(id="command-list")
+    def compose(self) -> ComposeResult:
+        with Vertical(id="palette-dialog"):
+            yield Input(placeholder="Filter commands...", id="palette-filter")
+            yield Static(id="command-list")
 
-    def set_entries(self, entries: list[PaletteEntry]) -> None:
-        """Replace the catalog and reset the palette state (R2)."""
-        self._entries = list(entries)
-        self._apply_filter(self.filter_query)
-        self._viewport_offset = 0
+    def on_mount(self) -> None:
+        """Focus the filter input once the palette screen is laid out."""
+        self.call_after_refresh(self._focus_filter)
+
+    def _focus_filter(self) -> None:
+        """Focus the filter Input (runs after the palette becomes visible)."""
+        try:
+            self.query_one("#palette-filter", expect_type=Input).focus()
+        except Exception:
+            self.focus()
 
     @property
     def _viewport_height(self) -> int:
-        """Dynamic viewport: content_height - header(2) - footer(2) - scroll_indicators(2).
-
-        self.size.height is the content area (excludes border + padding).
-        """
-        h = self.size.height if self.size.height > 0 else 21
+        """Dynamic viewport based on the visible list widget's height."""
+        try:
+            static = self.query_one("#command-list", expect_type=Static)
+            h = static.size.height
+        except Exception:
+            h = 20  # not mounted yet (unit tests exercise state directly)
         return max(4, h - 6)
 
     def _render_list(self) -> None:
@@ -157,36 +164,6 @@ class ModalMenu(Widget):
     def _on_filter_submitted(self, event: Input.Submitted) -> None:
         self.action_select()
 
-    def show(self) -> None:
-        """Show the modal menu."""
-        self.add_class("-visible")
-        self.selected_index = 0
-        self._viewport_offset = 0
-        self.filtered_commands = list(self._entries)
-        try:
-            self.query_one("#palette-filter", expect_type=Input).value = ""
-        except Exception:
-            pass
-        self._render_list()
-        # Focus can't land on a display:none widget — defer until the
-        # -visible class has been laid out.
-        self.call_after_refresh(self._focus_filter)
-
-    def _focus_filter(self) -> None:
-        """Focus the filter Input (runs after the palette becomes visible)."""
-        try:
-            self.query_one("#palette-filter", expect_type=Input).focus()
-        except Exception:
-            self.focus()
-
-    def hide(self) -> None:
-        """Hide the modal menu."""
-        self.remove_class("-visible")
-
-    @property
-    def is_shown(self) -> bool:
-        return "-visible" in self.classes
-
     def move_selection(self, delta: int) -> None:
         """Move selection up or down."""
         if self.filtered_commands:
@@ -210,11 +187,8 @@ class ModalMenu(Widget):
     # ── Actions ──────────────────────────────────────────────
 
     def action_close(self) -> None:
-        self.hide()
-        try:
-            self.app.query_one("#command-input").focus()
-        except Exception as exc:
-            self.app.notify(f"Focus return failed: {exc}", severity="warning")
+        """Cancel: dismiss the palette with no selection."""
+        self.dismiss(None)
 
     def action_move_up(self) -> None:
         self.move_selection(-1)
@@ -223,12 +197,9 @@ class ModalMenu(Widget):
         self.move_selection(1)
 
     def action_select(self) -> None:
-        entry = self.get_selected()
-        self.hide()
-        try:
-            self.app.query_one("#command-input").focus()
-        except Exception as exc:
-            self.app.notify(f"Focus return failed: {exc}", severity="warning")
-        if entry:
-            # DD-12: single dispatch path shared with the / dropdown.
-            self.app._dispatch_command(entry)
+        """Select the current entry: dismiss with it (``dismiss(entry)``).
+
+        The app's ``push_screen`` callback receives the entry and dispatches
+        it (DD-12).  Dismissing ``None`` cancels.
+        """
+        self.dismiss(self.get_selected())

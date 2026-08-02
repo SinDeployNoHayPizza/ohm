@@ -1,36 +1,44 @@
-"""OHM Model Selector Widget - Provider/model picker with keyboard navigation."""
+"""OHM Model Selector - ModalScreen-based provider/model picker with navigation."""
 
-from textual.widget import Widget
-from textual.reactive import reactive
-from textual.app import RenderResult
+from textual.app import ComposeResult
 from textual.binding import Binding
+from textual.containers import Vertical
+from textual.reactive import reactive
+from textual.screen import ModalScreen
+from textual.widgets import Static
 
 from ohm.core.config import get_config
 from ohm.core.provider import get_providers_ui_data
 
 
-class ModelSelector(Widget):
-    """Modal-style provider/model selector with keyboard navigation and scroll."""
+class ModelSelector(ModalScreen[tuple[dict, dict] | None]):
+    """Modal-style provider/model selector with keyboard navigation (R7).
 
-    DEFAULT_CSS = """
+    Presentation (R7/DD-03): inherits ``ModalScreen.DEFAULT_CSS`` so the app
+    behind is dimmed; the subclass CSS centers the dialog.  The rendered
+    provider/model list lives inside the dialog's ``Static`` (``_refresh``).
+
+    Navigation (R8/DD-11): left collapses the selected provider's branch,
+    right expands it.  Selecting a model applies it via the app's
+    ``_on_model_selected`` and dismisses the screen.
+    """
+
+    CSS = """
     ModelSelector {
+        align: center middle;
+    }
+    #model-selector-dialog {
         width: 70;
-        height: 24;
-        layer: modal;
+        height: 20;
         background: $surface;
         border: thick $primary;
         padding: 1 2;
-        display: none;
     }
-    ModelSelector.-visible {
-        display: block;
-    }
-    ModelSelector:focus {
-        border: thick $accent;
+    #model-list {
+        height: 1fr;
+        overflow-y: auto;
     }
     """
-
-    can_focus = True
 
     BINDINGS = [
         Binding("escape", "close", "Close"),
@@ -54,18 +62,22 @@ class ModelSelector(Widget):
         self._expanded: set[int] = {0}
         self._viewport_offset: int = 0
 
-    def refresh_providers(self) -> None:
-        """Reload provider list with current config/API keys."""
-        cfg = get_config()
-        self.providers = get_providers_ui_data(api_key_for=cfg.api_key_for)
+    def compose(self) -> ComposeResult:
+        with Vertical(id="model-selector-dialog"):
+            yield Static(id="model-list")
+
+    def on_mount(self) -> None:
+        """Render the initial list once the dialog is mounted."""
+        self._refresh()
 
     @property
     def _viewport_height(self) -> int:
-        """Dynamic viewport: content_height - header(2) - footer(2) - scroll_indicators(2).
-
-        self.size.height is the content area (excludes border + padding).
-        """
-        h = self.size.height if self.size.height > 0 else 20
+        """Dynamic viewport based on the model list widget's height."""
+        try:
+            static = self.query_one("#model-list", expect_type=Static)
+            h = static.size.height
+        except Exception:
+            h = 20  # not mounted yet (unit tests exercise state directly)
         return max(4, h - 6)
 
     def _build_lines(self) -> list[str]:
@@ -118,7 +130,8 @@ class ModelSelector(Widget):
                 line_idx += len(provider["models"])
         return self._HEADER_LINES
 
-    def render(self) -> RenderResult:
+    def _render_text(self) -> str:
+        """Build the viewport-sliced text for the model list."""
         content = self._build_lines()
         total = len(content)
         vp = self._viewport_height
@@ -155,23 +168,22 @@ class ModelSelector(Widget):
 
         return "\n".join(lines)
 
-    def show(self) -> None:
-        """Show the model selector and take focus."""
-        self.refresh_providers()
-        self.add_class("-visible")
-        self.selected_provider = 0
-        self.selected_model = 0
-        self._expanded = {0}
-        self._viewport_offset = 0
-        self.focus()
+    def _refresh(self) -> None:
+        """Rebuild the rendered list into the dialog's Static."""
+        if not hasattr(self, "providers"):
+            return  # not constructed yet (reactive watcher during __init__)
+        try:
+            self.query_one("#model-list", expect_type=Static).update(self._render_text())
+        except Exception:
+            pass  # not mounted yet (unit tests exercise state directly)
 
-    def hide(self) -> None:
-        """Hide the model selector."""
-        self.remove_class("-visible")
+    def watch_selected_provider(self, old_value: int, new_value: int) -> None:
+        """Re-render when the selected provider changes."""
+        self._refresh()
 
-    @property
-    def is_shown(self) -> bool:
-        return "-visible" in self.classes
+    def watch_selected_model(self, old_value: int, new_value: int) -> None:
+        """Re-render when the selected model changes."""
+        self._refresh()
 
     # ── Mouse scroll ─────────────────────────────────────────
 
@@ -186,12 +198,8 @@ class ModelSelector(Widget):
     # ── Actions ──────────────────────────────────────────────
 
     def action_close(self) -> None:
-        """Close the selector."""
-        self.hide()
-        try:
-            self.app.query_one("#command-input").focus()
-        except Exception as exc:
-            self.app.notify(f"Focus return failed: {exc}", severity="warning")
+        """Close the selector without choosing."""
+        self.dismiss(None)
 
     def action_move_up(self) -> None:
         """Move selection up."""
@@ -202,6 +210,7 @@ class ModelSelector(Widget):
             prev = self.providers[self.selected_provider]
             self.selected_model = len(prev["models"]) - 1
             self._expanded.add(self.selected_provider)
+        self._refresh()
 
     def action_move_down(self) -> None:
         """Move selection down."""
@@ -215,6 +224,7 @@ class ModelSelector(Widget):
                 self._expanded.add(self.selected_provider)
         else:
             self._expanded.add(self.selected_provider)
+        self._refresh()
 
     def action_page_up(self) -> None:
         for _ in range(3):
@@ -230,22 +240,21 @@ class ModelSelector(Widget):
             self._expanded.discard(self.selected_provider)
         else:
             self._expanded.add(self.selected_provider)
+        self._refresh()
 
     def action_expand(self) -> None:
         """Expand the selected provider's model branch (R8)."""
         self._expanded.add(self.selected_provider)
+        self._refresh()
 
     def action_collapse(self) -> None:
         """Collapse the selected provider's model branch (R8)."""
         self._expanded.discard(self.selected_provider)
+        self._refresh()
 
     def action_select(self) -> None:
-        """Select the current model and close."""
+        """Select the current model, apply it, and dismiss the screen."""
         provider = self.providers[self.selected_provider]
         model = provider["models"][self.selected_model]
         self.app._on_model_selected(provider, model)
-        self.hide()
-        try:
-            self.app.query_one("#command-input").focus()
-        except Exception as exc:
-            self.app.notify(f"Focus return failed: {exc}", severity="warning")
+        self.dismiss(None)

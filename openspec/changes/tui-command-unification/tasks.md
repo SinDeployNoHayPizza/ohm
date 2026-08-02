@@ -50,7 +50,7 @@ Base chain: PR 1 base = feature/tui-command-unification; PR 2 base = PR 1 branch
 
 ## Slice 3: FU-015 ModalScreen Conversion (R7)
 
-- [ ] 3.1 RED: modal/model tests assert ModalScreen subclass + dim + centered (R7 scenario)
-- [ ] 3.2 GREEN: `modal_menu.py` → `CommandPalette(ModalScreen)`; `dismiss(entry)` selection contract
-- [ ] 3.3 GREEN: `model_selector.py` → `ModelSelector(ModalScreen)` wrapping render list; drop modal-wrap CSS in app.py
-- [ ] 3.4 VERIFY: `uv run pytest` full green; smoke: palette, `/`, ctrl+j, F3/F2/Ctrl+K no stack, left/right nav
+- [x] 3.1 RED: modal/model tests assert ModalScreen subclass + dim + centered (R7 scenario)
+- [x] 3.2 GREEN: `modal_menu.py` → `CommandPalette(ModalScreen)`; `dismiss(entry)` selection contract
+- [x] 3.3 GREEN: `model_selector.py` → `ModelSelector(ModalScreen)` wrapping render list; drop modal-wrap CSS in app.py
+- [x] 3.4 VERIFY: `uv run pytest` full green; smoke: palette, `/`, ctrl+j, F3/F2/Ctrl+K no stack, left/right nav

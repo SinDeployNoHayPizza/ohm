@@ -22,9 +22,7 @@ from ohm.cli.widgets.input import CommandInput
 from ohm.cli.widgets.sidebar import Sidebar
 from ohm.cli.widgets.status import StatusBar
 from ohm.cli.widgets.progress import ContextProgress
-from ohm.cli.widgets.modal_menu import ModalMenu
 from ohm.cli.widgets.file_includer import FileIncluder
-from ohm.cli.widgets.model_selector import ModelSelector
 from ohm.cli.themes.default import OHM_DEFAULT
 from ohm.cli.themes.light import OHM_LIGHT
 from ohm.cli.themes.ocean import OHM_OCEAN
@@ -156,22 +154,6 @@ class OhmApp(App[None]):
         display: none;
         overflow-y: auto;
     }
-    #modal-wrap {
-        dock: bottom;
-        height: auto;
-        width: 100%;
-        align: center middle;
-        layer: modal;
-        margin-bottom: 1;
-    }
-    #model-selector-wrap {
-        dock: bottom;
-        height: auto;
-        width: 100%;
-        align: center middle;
-        layer: modal;
-        margin-bottom: 1;
-    }
     #file-includer-wrap {
         dock: bottom;
         height: auto;
@@ -261,12 +243,8 @@ class OhmApp(App[None]):
                 yield CommandInput()
             yield Sidebar(id="sidebar")
         yield StatusBar()
-        with Horizontal(id="modal-wrap"):
-            yield ModalMenu(id="modal-menu")
         with Horizontal(id="file-includer-wrap"):
             yield FileIncluder(id="file-includer")
-        with Horizontal(id="model-selector-wrap"):
-            yield ModelSelector(id="model-selector")
 
     def on_mount(self) -> None:
         """Called when app is mounted. Replay continue session or restore."""
@@ -383,17 +361,27 @@ class OhmApp(App[None]):
         self.notify(f"Theme: {self.current_theme_name}", severity="info")
 
     def action_command_palette(self) -> None:
-        """Open/close the command palette modal."""
-        modal = self.query_one("#modal-menu")
-        if modal.is_shown:
-            modal.hide()
+        """Open/close the command palette modal (R6 toggle, DD-09).
+
+        The palette is a pushed ``CommandPalette(ModalScreen)`` (FU-015/R7).
+        A repeated Ctrl+K pops it; the dismiss callback dispatches the
+        selected entry (DD-12).
+        """
+        from ohm.cli.widgets.modal_menu import CommandPalette
+
+        if self._is_open(CommandPalette):
+            self.pop_screen()
+            return
+
+        def on_select(entry: PaletteEntry | None) -> None:
+            if entry is not None:
+                self._dispatch_command(entry)
             try:
                 self.query_one("#command-input").focus()
             except Exception as exc:
                 self.notify(f"Focus return failed: {exc}", severity="warning")
-        else:
-            modal.set_entries(self._palette_entries())
-            modal.show()
+
+        self.push_screen(CommandPalette(self._palette_entries()), on_select)
 
     def _palette_entries(self) -> list[PaletteEntry]:
         """The shared TUI catalog (R2): palette and dropdown render identical sets."""
@@ -550,16 +538,24 @@ class OhmApp(App[None]):
         self.push_screen(ConfirmClear(), on_confirm)
 
     def action_model_selector(self) -> None:
-        """Open/close the model selector."""
-        selector = self.query_one("#model-selector")
-        if selector.is_shown:
-            selector.hide()
+        """Open/close the model selector modal (R6 toggle, DD-09).
+
+        The selector is a pushed ``ModelSelector(ModalScreen)`` (FU-015/R7).
+        A repeated F2 pops it.
+        """
+        from ohm.cli.widgets.model_selector import ModelSelector
+
+        if self._is_open(ModelSelector):
+            self.pop_screen()
+            return
+
+        def on_close(result: tuple[dict, dict] | None) -> None:
             try:
                 self.query_one("#command-input").focus()
             except Exception as exc:
                 self.notify(f"Focus return failed: {exc}", severity="warning")
-        else:
-            selector.show()
+
+        self.push_screen(ModelSelector(), on_close)
 
     def _resolve_context_window(self, provider_name: str, model_id: str) -> int:
         """Look up context_window for a given provider/model ID."""

@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.1.8 — 2026-08-01
+
+### Changed
+
+- **TUI command unification (slice 3 — modal presentation)**: the command palette
+  (`CommandPalette`) and model selector (`ModelSelector`) are now `ModalScreen`
+  subclasses — translucent dim backdrop over the app with a centered dialog,
+  matching the session modal presentation. Palette selection uses a
+  `dismiss(entry)` contract; push/pop lifecycle unified with the single-toggle
+  guard. (`#tui-command-unification`)
+
 ## v0.1.7 — 2026-08-01
 
 ### Added
