@@ -8,6 +8,30 @@ from ohm.core.skills.loader import SkillLoader
 from ohm.core.skills.registry import SkillRegistry
 
 
+class TestDefaultSkillSearchPaths:
+    """DD-08: hoisted single source shared by TUI (on_mount) and CLI skill."""
+
+    def test_default_skill_search_paths_is_callable(self):
+        from ohm.core.skills.loader import DEFAULT_SKILL_SEARCH_PATHS
+
+        assert callable(DEFAULT_SKILL_SEARCH_PATHS)
+
+    def test_default_skill_search_paths_order(self, tmp_path, monkeypatch):
+        from ohm.core.skills.loader import DEFAULT_SKILL_SEARCH_PATHS
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+
+        resolved = [p.resolve() for p in DEFAULT_SKILL_SEARCH_PATHS()]
+        expected = [
+            (tmp_path / ".agents" / "skills").resolve(),
+            (tmp_path / ".ohm" / "skills").resolve(),
+            (tmp_path / ".ohm" / "skills").resolve(),
+            (tmp_path / ".gemini" / "skills").resolve(),
+        ]
+        assert resolved == expected
+
+
 class TestSkillLoader:
     def test_parse_skill_md_with_yaml_frontmatter(self, tmp_path):
         skill_dir = tmp_path / "my-skill"

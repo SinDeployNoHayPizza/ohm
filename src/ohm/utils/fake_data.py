@@ -64,36 +64,6 @@ FAKE_CHAT_MESSAGES = [
 ]
 
 # ──────────────────────────────────────────────────────────────
-# Commands
-# ──────────────────────────────────────────────────────────────
-
-# Commands shared by both / dropdown and Ctrl+K palette.
-# Entries with a "key" field map to a real OhmApp action; others are display-only.
-FAKE_COMMANDS = [
-    {"name": "/run", "description": "Execute a prompt", "category": "core", "hotkey": "Ctrl+Enter"},
-    {"name": "/fix", "description": "Fix a specific file or issue", "category": "core", "hotkey": "Ctrl+F"},
-    {"name": "/test", "description": "Run test suite", "category": "core", "hotkey": "Ctrl+T"},
-    {"name": "/review", "description": "Review code changes", "category": "core", "hotkey": "Ctrl+R"},
-    {"name": "/goal", "description": "Set autonomous goal with subtask breakdown", "category": "core", "hotkey": "Ctrl+G"},
-    {"name": "/loop", "description": "Run task in loop until goal/condition met", "category": "core", "hotkey": "Ctrl+."},
-    {"name": "/deploy", "description": "Deploy to staging/production", "category": "ops", "hotkey": None},
-    {"name": "/config", "description": "Open configuration", "category": "settings", "hotkey": "Ctrl+,"},
-    {"name": "/model", "description": "Switch model", "category": "settings", "hotkey": "Ctrl+M"},
-    {"name": "/provider", "description": "Switch provider", "category": "settings", "hotkey": "Ctrl+P"},
-    {"name": "/clear", "description": "Clear chat history", "category": "ui", "hotkey": "Ctrl+L"},
-    {"name": "/help", "description": "Show help", "category": "ui", "hotkey": "F1"},
-    {"name": "/status", "description": "Show system status", "category": "info", "hotkey": None},
-    {"name": "/history", "description": "Show command history", "category": "info", "hotkey": "Ctrl+H"},
-    {"name": "/theme", "description": "Change theme", "category": "ui", "hotkey": None},
-    {"name": "/exit", "description": "Exit OHM", "category": "system", "hotkey": "Ctrl+Q"},
-    # ── Real session commands (wired to OhmApp actions) ──
-    {"name": "/sessions", "description": "Browse saved sessions", "category": "session", "hotkey": "F3", "key": "session_browser"},
-    {"name": "/session list", "description": "List saved sessions", "category": "session", "hotkey": "F3", "key": "session_browser"},
-    {"name": "/session continue", "description": "Resume the last session", "category": "session", "hotkey": None, "key": "session_continue"},
-    {"name": "/session clear", "description": "Delete all sessions", "category": "session", "hotkey": None, "key": "session_clear"},
-]
-
-# ──────────────────────────────────────────────────────────────
 # File Tree (for # file inclusion demo)
 # ──────────────────────────────────────────────────────────────
 
@@ -257,32 +227,6 @@ class Agent:
         }
 ''',
 }
-
-
-# ──────────────────────────────────────────────────────────────
-# Hotkeys
-# ──────────────────────────────────────────────────────────────
-
-FAKE_HOTKEYS = [
-    {"key": "Ctrl+K", "action": "Command Palette", "category": "Navigation"},
-    {"key": "Ctrl+L", "action": "Clear Chat", "category": "UI"},
-    {"key": "Ctrl+P", "action": "Switch Provider", "category": "Provider"},
-    {"key": "Ctrl+M", "action": "Switch Model", "category": "Provider"},
-    {"key": "Ctrl+S", "action": "Toggle Sidebar", "category": "UI"},
-    {"key": "Ctrl+D", "action": "Toggle Theme", "category": "UI"},
-    {"key": "Ctrl+Q", "action": "Quit", "category": "System"},
-    {"key": "Ctrl+Enter", "action": "Send Message", "category": "Chat"},
-    {"key": "Ctrl+T", "action": "Run Tests", "category": "Core"},
-    {"key": "Ctrl+R", "action": "Review Code", "category": "Core"},
-    {"key": "Ctrl+F", "action": "Fix File", "category": "Core"},
-    {"key": "Ctrl+G", "action": "Set Goal", "category": "Core"},
-    {"key": "Ctrl+.", "action": "Run Loop", "category": "Core"},
-    {"key": "Ctrl+H", "action": "Command History", "category": "Info"},
-    {"key": "Ctrl+,", "action": "Open Settings", "category": "Settings"},
-    {"key": "F1", "action": "Show Help", "category": "UI"},
-    {"key": "Esc", "action": "Close Modal", "category": "UI"},
-    {"key": "Tab", "action": "Autocomplete", "category": "Input"},
-]
 
 
 # ──────────────────────────────────────────────────────────────

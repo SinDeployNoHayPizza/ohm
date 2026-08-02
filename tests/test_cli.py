@@ -286,3 +286,66 @@ class TestSkillCommand:
         assert code == 0
         assert "Discovered Skills (1)" in out
         assert "(disabled)" in out
+
+
+class TestCliTuiParity:
+    """R1: every ``register_all`` subcommand maps to exactly one TUI class.
+
+    FU-009: the TUI catalog must never silently lose a CLI surface, and no
+    CLI subcommand may map to more than one class.
+    """
+
+    @staticmethod
+    def _registered_cli_names() -> set[str]:
+        from ohm.commands import register_all
+
+        reg = Registry()
+        register_all(reg)
+        return set(reg._subcommands)
+
+    def test_every_cli_subcommand_maps_to_exactly_one_class(self):
+        from ohm.core.commands import CLI_TUI_MAPPING
+
+        cli_names = self._registered_cli_names()
+        assert len(cli_names) == 15
+        assert cli_names == set(CLI_TUI_MAPPING) - {"--version", "-h"}
+
+    def test_classified_count_equals_registered_count(self):
+        from ohm.core.commands import CLI_TUI_MAPPING
+
+        cli_names = self._registered_cli_names()
+        # 15 subcommands + the two flag surfaces (--version, -h)
+        assert len(CLI_TUI_MAPPING) == len(cli_names) + 2
+
+    def test_none_omitted_all_have_explicit_kind(self):
+        from ohm.core.commands import CLI_TUI_MAPPING, CommandKind
+
+        for name, kind in CLI_TUI_MAPPING.items():
+            assert isinstance(kind, CommandKind), name
+        assert CLI_TUI_MAPPING["--version"] is CommandKind.TUI_IRRELEVANT
+        assert CLI_TUI_MAPPING["-h"] is CommandKind.TUI_IRRELEVANT
+
+    def test_real_class_is_exactly_session_skills_skill(self):
+        from ohm.core.commands import CLI_TUI_MAPPING, CommandKind
+
+        real = {n for n, k in CLI_TUI_MAPPING.items() if k is CommandKind.REAL}
+        assert real == {"session", "skills", "skill"}
+
+    def test_display_only_class_matches_ratified_mapping(self):
+        from ohm.core.commands import CLI_TUI_MAPPING, CommandKind
+
+        display = {
+            n for n, k in CLI_TUI_MAPPING.items() if k is CommandKind.DISPLAY_ONLY
+        }
+        assert display == {"config", "test", "run", "status", "goal", "loop"}
+
+    def test_irrelevant_class_is_everything_else(self):
+        from ohm.core.commands import CLI_TUI_MAPPING, CommandKind
+
+        irrelevant = {
+            n for n, k in CLI_TUI_MAPPING.items() if k is CommandKind.TUI_IRRELEVANT
+        }
+        assert irrelevant == {
+            "doctor", "mcp", "cron", "init", "serve", "plugin",
+            "--version", "-h",
+        }

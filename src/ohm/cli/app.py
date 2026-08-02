@@ -30,9 +30,14 @@ from ohm.cli.themes.light import OHM_LIGHT
 from ohm.cli.themes.ocean import OHM_OCEAN
 from ohm.cli.themes.gruvbox import OHM_GRUVBOX
 from ohm.core.agent import Agent, AgentConfig
-from ohm.core.commands import CommandRegistry
+from ohm.core.commands import (
+    CommandKind,
+    CommandRegistry,
+    PaletteEntry,
+    palette_entries,
+)
 from ohm.core.provider import resolve_context_window
-from ohm.utils.fake_data import FAKE_COMMANDS
+from ohm.core.skills.loader import DEFAULT_SKILL_SEARCH_PATHS, SkillLoader
 from ohm.commands.session import _gen_session_id, _save_session, _load_last_session
 
 
@@ -232,6 +237,7 @@ class OhmApp(App[None]):
             base_url=self.config.base_url,
         ))
         self.commands = CommandRegistry()
+        self._skills: dict = {}  # populated once in on_mount (FU-013/R3)
 
         self._total_tokens_used = 0
         self._continue_session = continue_session
@@ -264,6 +270,9 @@ class OhmApp(App[None]):
 
     def on_mount(self) -> None:
         """Called when app is mounted. Replay continue session or restore."""
+        # FU-013/R3: discover skills once — feeds the shared TUI catalog.
+        self._skills = SkillLoader.discover_skills(DEFAULT_SKILL_SEARCH_PATHS())
+
         if self._continue_session:
             msgs = self._continue_session.get("messages", [])
             if msgs:
@@ -372,7 +381,51 @@ class OhmApp(App[None]):
             except Exception as exc:
                 self.notify(f"Focus return failed: {exc}", severity="warning")
         else:
+            modal.set_entries(self._palette_entries())
             modal.show()
+
+    def _palette_entries(self) -> list[PaletteEntry]:
+        """The shared TUI catalog (R2): palette and dropdown render identical sets."""
+        return palette_entries(self.commands.get_all(), self._skills)
+
+    def _dispatch_command(self, entry: PaletteEntry) -> None:
+        """Execute a palette/dropdown entry (DD-12).
+
+        REAL entries dispatch their TUI action (e.g. ``session_browser``);
+        DISPLAY_ONLY entries post a chat message.  Both the Ctrl+K palette
+        and the ``/`` dropdown submit through this single path (R2).
+        """
+        chat = self.query_one("ChatArea")
+        if entry.kind is CommandKind.REAL and entry.action:
+            action = getattr(self, f"action_{entry.action}", None)
+            if action is not None:
+                if entry.payload:
+                    action(entry.payload)
+                else:
+                    action()
+                return
+        chat.add_message("system", f"Command executed: {entry.name}")
+
+    def action_skill_run(self, skill_name: str) -> None:
+        """Inject a discovered skill's instructions into the chat (FU-014).
+
+        Minimal contract: post a chat marker and append the skill body as
+        the next user turn so the agent acts on it.
+        """
+        skill = (self._skills or {}).get(skill_name)
+        chat = self.query_one("ChatArea")
+        if skill is None:
+            chat.add_message("system", f"Skill not found: {skill_name}")
+            self.notify(f"Skill not found: {skill_name}", severity="warning", timeout=3)
+            return
+        chat.add_message("system", f"Skill loaded: {skill_name}")
+        body = getattr(skill, "instructions", "")[:4000]
+        self._session_data["messages"].append({
+            "role": "user",
+            "content": f"[Skill: {skill_name}]\n{body}".strip(),
+            "timestamp": datetime.now().isoformat(),
+        })
+        self.notify(f"Skill {skill_name} loaded into chat", severity="info", timeout=3)
 
     def action_settings(self) -> None:
         """Open settings modal."""
@@ -533,14 +586,14 @@ class OhmApp(App[None]):
         if text.startswith("/") and len(text) >= 1:
             query = text[1:].lower()
             matches = [
-                cmd for cmd in FAKE_COMMANDS
-                if query in cmd["name"].lower() or query in cmd["description"].lower()
+                entry for entry in self._palette_entries()
+                if query in entry.name.lower() or query in entry.description.lower()
             ]
             if matches:
                 lines = []
-                for cmd in matches:
-                    hotkey = f" ({cmd['hotkey']})" if cmd.get("hotkey") else ""
-                    lines.append(f" [bold cyan]{cmd['name']}[/] {cmd['description']}{hotkey}")
+                for entry in matches:
+                    hotkey = f" ({entry.hotkey})" if entry.hotkey else ""
+                    lines.append(f" [bold cyan]{entry.name}[/] {entry.description}{hotkey}")
                 dropdown.update("\n".join(lines))
                 dropdown.styles.display = "block"
                 self._dropdown_open = True
@@ -554,22 +607,16 @@ class OhmApp(App[None]):
         chat = self.query_one("ChatArea")
 
         if text.startswith("/"):
-            cmd_name = text.split()[0] if text else ""
-            # Check for multi-word commands first (/session list, /session continue)
             full_cmd = text.strip().lower()
-            cmd_entry = next(
-                (c for c in FAKE_COMMANDS if c["name"] == full_cmd),
-                next((c for c in FAKE_COMMANDS if c["name"] == cmd_name), None),
+            cmd_name = full_cmd.split()[0] if full_cmd else ""
+            # Match full command first (/session list), then the prefix word.
+            entries = self._palette_entries()
+            entry = next(
+                (e for e in entries if e.name.lower() == full_cmd),
+                next((e for e in entries if e.name.lower() == cmd_name), None),
             )
-            if cmd_entry:
-                key = cmd_entry.get("key")
-                if key:
-                    action_name = f"action_{key}"
-                    action = getattr(self, action_name, None)
-                    if action:
-                        action()
-                        return
-                chat.add_message("system", f"Command executed: {cmd_entry['name']}")
+            if entry:
+                self._dispatch_command(entry)
             else:
                 chat.add_message("system", f"Unknown command: {cmd_name}")
         elif text:

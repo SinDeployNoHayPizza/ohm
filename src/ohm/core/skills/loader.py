@@ -13,6 +13,24 @@ from ohm.core.skills.schema import Skill
 logger = logging.getLogger(__name__)
 
 
+def default_skill_search_paths() -> list[Path]:
+    """Default skill search locations (project-local first, then user-global).
+
+    Evaluated per call so tests can patch ``Path.home()`` and/or ``chdir``.
+    """
+    return [
+        Path(".agents/skills"),
+        Path(".ohm/skills"),
+        Path.home() / ".ohm" / "skills",
+        Path.home() / ".gemini" / "skills",
+    ]
+
+
+# DD-08: single source shared by the TUI (``OhmApp.on_mount``) and the CLI
+# ``skill`` command.  Callable on purpose — resolves paths per call.
+DEFAULT_SKILL_SEARCH_PATHS = default_skill_search_paths
+
+
 class SkillLoader:
     """Parses SKILL.md files and discovers skill packages across directories."""
 
