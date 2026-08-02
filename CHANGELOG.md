@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.1.9 — 2026-08-02
+
+### Added
+
+- **`ohm skill inspect <name>`**: new subcommand showing a skill's details (name,
+  description, absolute path, enabled state, instructions) in the `list` output
+  style; exits 0 for a known skill and 1 for an unknown one.
+  (`#skills-registry-followups`)
+
+### Changed
+
+- **`Skill.path` is now absolute**: the loader resolves each skill directory via
+  `path.parent.resolve()`, making the printed path spec-compliant ("Absolute
+  Path") and environment-independent. (`#skills-registry-followups`)
+- **ASCII-safe skill output**: `ohm skill list` uses ASCII-safe separators
+  instead of non-ASCII glyphs, fixing mojibake in legacy-codepage Windows
+  console captures. (`#skills-registry-followups`)
+- **Skills registry cleanup**: removed all 11 unused imports (ruff F401) from
+  `src/ohm/core/skills/registry.py` and the CLI tests. (`#skills-registry-followups`)
+
+### Fixed
+
+- **Skills registry follow-ups (FU-001..FU-008)**: implemented `inspect`,
+  absolute paths, ASCII-safe output, priority-override test, header-only
+  `SKILL.md` fallback coverage, `parse_skill_file` naming alignment, defensive
+  unknown-action test, and import cleanup. (`#skills-registry-followups`)
+
 ## v0.1.8 — 2026-08-01
 
 ### Changed
