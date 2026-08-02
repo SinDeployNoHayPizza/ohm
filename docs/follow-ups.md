@@ -23,6 +23,14 @@ Source of truth for archived-change follow-ups: `openspec/changes/archive/<date>
 
 | ID | Change | Resolution |
 |----|--------|------------|
+| FU-001 | skills-registry-followups | Implemented in change `skills-registry-followups`: `ohm skill inspect <name>` subcommand (exit 0 known / 1 unknown) wired in `src/ohm/commands/skill.py`; `load_skills()`/`register()` naming retained, `inspect` added alongside. |
+| FU-002 | skills-registry-followups | Implemented: replaced non-ASCII glyphs `•`/`—` with ASCII-safe `-` in `src/ohm/commands/skill.py` output; `test_skill_list_output_is_ascii_only` guards it. |
+| FU-003 | skills-registry-followups | Implemented: removed all 11 ruff F401 unused imports (`src/ohm/core/skills/registry.py` + 10 across tests); ruff check clean on change files. |
+| FU-004 | skills-registry-followups | Implemented: `test_discover_skills_priority_override_first_wins` proves same-name priority override (loader `discover_skills` first-wins across sources). |
+| FU-005 | skills-registry-followups | Implemented: `Skill.path` is now absolute via `path.parent.resolve()` in `parse_skill_file` (spec-compliant "Absolute Path"); `test_discover_skills_path_is_absolute` asserts it. |
+| FU-006 | skills-registry-followups | Implemented: parser entry point renamed to `parse_skill_file` (canonical name); no dangling `parse_skill_md` references in src/tests. |
+| FU-007 | skills-registry-followups | Implemented: canonical `skills-registry` spec wording aligned — frontmatter-only parsing + directory-name fallback (header-only SKILL.md handled); `test_parse_skill_file_header_only_falls_back_to_dirname` covers it. |
+| FU-008 | skills-registry-followups | Implemented: `test_skill_handler_unknown_action_returns_one` covers the unknown-action branch via direct handler call (dispatch-level exit-2 semantics preserved). |
 | FU-009 | tui-command-unification | Implemented in change `tui-command-unification` slice 1: single command catalog (`CLI_TUI_MAPPING` in `src/ohm/core/commands.py`), parity bijection tests prove no command lost. |
 | FU-010 | tui-command-unification | Implemented: single `_dispatch_command` (`src/ohm/cli/app.py:390`) shared by palette and dropdown; both surfaces render the same catalog plus skills appended last. |
 | FU-011 | tui-command-unification | Implemented: Ctrl+J wired as `input_newline` (inserts `\n` without confirming), Ctrl+M submits — `_on_key` handling in `src/ohm/cli/input.py:20-32`, tested. |

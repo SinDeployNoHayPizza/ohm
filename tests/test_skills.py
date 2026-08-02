@@ -1,7 +1,6 @@
 """Tests for Skills Loader and Registry."""
 
 from pathlib import Path
-import pytest
 
 from ohm.core.skills.schema import Skill
 from ohm.core.skills.loader import SkillLoader
@@ -33,7 +32,7 @@ class TestDefaultSkillSearchPaths:
 
 
 class TestSkillLoader:
-    def test_parse_skill_md_with_yaml_frontmatter(self, tmp_path):
+    def test_parse_skill_file_with_yaml_frontmatter(self, tmp_path):
         skill_dir = tmp_path / "my-skill"
         skill_dir.mkdir()
         skill_md = skill_dir / "SKILL.md"
@@ -62,6 +61,62 @@ class TestSkillLoader:
         assert "skill-a" in discovered
         assert "skill-b" in discovered
         assert discovered["skill-a"].description == "Skill A"
+
+    def test_discover_skills_path_is_absolute(self, tmp_path, monkeypatch):
+        """FU-005: discovered skill paths are absolute and point at the SKILL.md folder."""
+        skill_dir = tmp_path / ".agents" / "skills" / "skill-a"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: skill-a\ndescription: Skill A\n---\nBody A",
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(tmp_path)
+
+        discovered = SkillLoader.discover_skills([Path(".agents/skills")])
+
+        skill = discovered["skill-a"]
+        assert skill.path.is_absolute()
+        assert skill.path == (tmp_path / ".agents" / "skills" / "skill-a").resolve()
+        assert (skill.path / "SKILL.md").is_file()
+
+    def test_discover_skills_priority_override_first_wins(self, tmp_path, monkeypatch):
+        """FU-004: same-name skills keep the highest-priority instance (first-wins)."""
+        local = tmp_path / ".agents" / "skills" / "foo"
+        local.mkdir(parents=True)
+        (local / "SKILL.md").write_text(
+            "---\nname: foo\ndescription: From .agents/skills\n---\nBody A",
+            encoding="utf-8",
+        )
+        override = tmp_path / ".ohm" / "skills" / "foo"
+        override.mkdir(parents=True)
+        (override / "SKILL.md").write_text(
+            "---\nname: foo\ndescription: From .ohm/skills\n---\nBody B",
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+
+        from ohm.core.skills.loader import DEFAULT_SKILL_SEARCH_PATHS
+        discovered = SkillLoader.discover_skills(DEFAULT_SKILL_SEARCH_PATHS())
+
+        assert discovered["foo"].description == "From .agents/skills"
+
+    def test_parse_skill_file_header_only_falls_back_to_dirname(self, tmp_path):
+        """FU-007: no frontmatter -> dirname name, generic description, full text instructions."""
+        skill_dir = tmp_path / "header-only"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text(
+            "# My Skill\n\nInstructions go here.",
+            encoding="utf-8",
+        )
+
+        skill = SkillLoader.parse_skill_file(skill_dir / "SKILL.md")
+
+        assert skill is not None
+        assert skill.name == "header-only"
+        assert skill.description == "Skill header-only"
+        assert skill.metadata == {}  # headers are NOT parsed as metadata
+        assert skill.instructions == "# My Skill\n\nInstructions go here."
 
 
 class TestSkillRegistry:

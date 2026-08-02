@@ -68,7 +68,7 @@ class SkillLoader:
         return Skill(
             name=name,
             description=description,
-            path=path.parent,
+            path=path.parent.resolve(),
             instructions=instructions,
             metadata=metadata,
         )

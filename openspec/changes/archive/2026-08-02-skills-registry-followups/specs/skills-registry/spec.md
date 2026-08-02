@@ -1,47 +1,6 @@
-# Skills Registry Specification
+# Delta for skills-registry
 
-> **Status**: IMPLEMENTED & STABLE — synced from change `skills-registry-followups` (archived 2026-08-02). Verify verdict: PASS WITH WARNINGS (10/10 scenarios, 212/212 tests). Closes follow-ups FU-001..FU-008 from `skills-registry-loader` (archived 2026-07-31).
-
-## Purpose
-
-Discover, validate, register, and load declarative skill packages (`SKILL.md`, tool configurations, prompt templates) dynamically into the agent runtime.
-
-## Requirements
-
-### Requirement: Skill Discovery
-
-The loader MUST discover skills in target directories in priority order:
-
-1. Local workspace `.agents/skills/<skill-name>/`
-2. Local workspace `.ohm/skills/<skill-name>/`
-3. User home `~/.ohm/skills/<skill-name>/`
-4. System shared `~/.gemini/skills/<skill-name>/`
-
-Each skill directory MUST contain a `SKILL.md` file. Metadata MUST be parsed from YAML frontmatter only; Markdown headers MUST NOT be parsed as metadata. A `SKILL.md` without frontmatter MUST fall back to its directory name and a generic description.
-
-#### Scenario: Frontmatter skill discovery
-
-- GIVEN a skill directory whose `SKILL.md` has YAML frontmatter
-- WHEN discovery runs
-- THEN the skill registers with the frontmatter name and description
-
-#### Scenario: Header-only SKILL.md fallback
-
-- GIVEN a `SKILL.md` with no YAML frontmatter
-- WHEN discovery runs
-- THEN the skill registers with its directory name and a generic description
-- AND full file text becomes instructions
-
-### Requirement: Skill Manifest Schema
-
-- `name`: Unique lowercase identifier (e.g. `python-debugger`).
-- `description`: Human-readable summary of what the skill does.
-- `path`: Absolute Path to the skill folder.
-- `instructions`: Full text instructions from `SKILL.md`.
-
-### Requirement: Skill Registry Management
-
-`SkillRegistry` MUST maintain active skills, enable/disable skills dynamically, and format prompt context for `Agent`.
+## ADDED Requirements
 
 ### Requirement: Skill Inspection
 
@@ -124,3 +83,31 @@ Skill command, loader, registry, and their tests MUST NOT contain unused imports
 - GIVEN the skill sources and their tests
 - WHEN `uv run ruff check` is run
 - THEN no F401 violations are reported
+
+## MODIFIED Requirements
+
+### Requirement: Skill Discovery
+
+The loader MUST discover skills in target directories in priority order:
+
+1. Local workspace `.agents/skills/<skill-name>/`
+2. Local workspace `.ohm/skills/<skill-name>/`
+3. User home `~/.ohm/skills/<skill-name>/`
+4. System shared `~/.gemini/skills/<skill-name>/`
+
+Each skill directory MUST contain a `SKILL.md` file. Metadata MUST be parsed from YAML frontmatter only; Markdown headers MUST NOT be parsed as metadata. A `SKILL.md` without frontmatter MUST fall back to its directory name and a generic description.
+
+(Previously: required "a valid SKILL.md frontmatter or header", implying header parsing; now frontmatter-only with directory-name fallback.)
+
+#### Scenario: Frontmatter skill discovery
+
+- GIVEN a skill directory whose `SKILL.md` has YAML frontmatter
+- WHEN discovery runs
+- THEN the skill registers with the frontmatter name and description
+
+#### Scenario: Header-only SKILL.md fallback
+
+- GIVEN a `SKILL.md` with no YAML frontmatter
+- WHEN discovery runs
+- THEN the skill registers with its directory name and a generic description
+- AND full file text becomes instructions
