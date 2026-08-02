@@ -18,17 +18,16 @@ Source of truth for archived-change follow-ups: `openspec/changes/archive/<date>
 | FU-006 | skills-registry-loader | SUGGESTION | Naming drift: `parse_skill_md()` (tasks.md 1.1) vs `parse_skill_file()` (code). | Rename to match, or update tasks/design. |
 | FU-007 | skills-registry-loader | SUGGESTION | Header-only `SKILL.md` handling wording vs design.md:7. | Align implementation or design wording. |
 | FU-008 | skills-registry-loader | SUGGESTION | `src/ohm/commands/skill.py:59-60` unknown-action branch untested. | Add CLI test for unknown subcommand. |
-| FU-009 | tui-command-unification (planned) | BUG | TUI and CLI command lists are not unified: some CLI commands have TUI counterparts (executed differently), others (version, CLI help) are TUI-irrelevant. Needs a guard test proving no command is lost. | Unify command list; keep CLI-only commands apart; add parity test. |
-| FU-010 | tui-command-unification (planned) | BUG | TUI has two command lists: Ctrl+P modal and `/`-prefixed input menu — they must show the same set (plus skills at the end of each listing). | Single source of truth for both surfaces. |
-| FU-011 | tui-command-unification (planned) | BUG | Evaluate Ctrl+J as `input_newline`: inserts a line break without confirming the input. | Confirm widget supports it; wire keybinding. |
-| FU-012 | tui-command-unification (planned) | BUG | Command modal has no filter/search input. | Add filter input to command modal. |
-| FU-013 | tui-command-unification (planned) | BUG | Pressing F3 multiple times doesn't close the modal (or stacks new modals) — requires same number of Esc presses. | Guard modal against re-open/stack; single-toggle behavior. |
-| FU-014 | tui-command-unification (planned) | BUG | Skills commands missing from the command modal and the `/` popup menu. | Register skills commands in both surfaces. |
-| FU-015 | tui-command-unification (planned) | BUG | Session modal is visually better (no opaque side dimming); apply the same visual style to model and command modals. | Align modal styling. |
-| FU-016 | tui-command-unification (planned) | BUG | Model modal lacks collapse/expand of branches (left/right arrow keys). | Add collapse/expand navigation. |
 
 ## Resolved
 
 | ID | Change | Resolution |
 |----|--------|------------|
-| — | — | — |
+| FU-009 | tui-command-unification | Implemented in change `tui-command-unification` slice 1: single command catalog (`CLI_TUI_MAPPING` in `src/ohm/core/commands.py`), parity bijection tests prove no command lost. |
+| FU-010 | tui-command-unification | Implemented: single `_dispatch_command` (`src/ohm/cli/app.py:390`) shared by palette and dropdown; both surfaces render the same catalog plus skills appended last. |
+| FU-011 | tui-command-unification | Implemented: Ctrl+J wired as `input_newline` (inserts `\n` without confirming), Ctrl+M submits — `_on_key` handling in `src/ohm/cli/input.py:20-32`, tested. |
+| FU-012 | tui-command-unification | Implemented: command modal has filter input (`Input#palette-filter`) with live filtering in `src/ohm/cli/widgets/modal_menu.py`. |
+| FU-013 | tui-command-unification | Implemented: `_is_open` screen-stack guard — repeat toggle pops, re-open is no-op (single-toggle behavior); tested for F3/settings/quit. |
+| FU-014 | tui-command-unification | Implemented: skills commands registered in both palette and `/` dropdown via shared catalog; `test_skills_appended_last_sorted_by_name`. |
+| FU-015 | tui-command-unification | Implemented: command and model modals converted to `ModalScreen` (same visual style as session modal) in `src/ohm/cli/widgets/modal_menu.py`. |
+| FU-016 | tui-command-unification | Implemented: left/right arrow collapse/expand branch navigation in model modal; `TestBranchNavigation` (5 cases) + keys tests. |
