@@ -9,14 +9,15 @@ from textual import on
 
 
 class _SubmitTextArea(TextArea):
-    """TextArea that submits on plain Enter.
+    """TextArea that submits on Enter/Ctrl+M and inserts on Ctrl+J.
 
-    Enter submits the message immediately.
-    Use the Send button as a visual alternative.
+    - ``enter``/``ctrl+m`` (aliased by ``KEY_ALIASES``) submit immediately.
+    - ``ctrl+j`` (alias ``newline``) inserts a newline at the cursor and
+      never submits (R4).
     """
 
-    def _on_key(self, event: Key) -> None:
-        if event.key == "enter":
+    async def _on_key(self, event: Key) -> None:
+        if event.key in ("enter", "ctrl+m") or "enter" in event.aliases:
             event.stop()
             event.prevent_default()
             # self → Horizontal → CommandInput
@@ -25,7 +26,12 @@ class _SubmitTextArea(TextArea):
                 if hasattr(cmd_input, "action_submit_input"):
                     cmd_input.action_submit_input()  # type: ignore[union-attr]
                     return
-        super()._on_key(event)
+        elif event.key == "ctrl+j" or "newline" in event.aliases:
+            event.stop()
+            event.prevent_default()
+            self.insert("\n")
+            return
+        await super()._on_key(event)
 
 
 class CommandInput(Widget):

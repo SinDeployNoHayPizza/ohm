@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.1.7 — 2026-08-01
+
+### Added
+
+- **TUI command unification (slice 2 — widget fixes)**: Ctrl+J inserts a newline
+  in the chat input without submitting; Ctrl+M submits like Enter (alias symmetry).
+  Command palette gains a live filter Input (`Input.Changed` → `_apply_filter`),
+  narrowing by name/description and resetting selection to the first entry.
+  (`#tui-command-unification`)
+- **Modal single-toggle guard**: repeated F3/F2/Ctrl+K no longer stack modals —
+  `_is_open(T)` reads `screen_stack`; toggle modals pop on repeat, push modals
+  no-op. (`#tui-command-unification`)
+- **Model selector branch navigation**: left/right arrows collapse/expand the
+  selected provider's model branch in the expanded set. (`#tui-command-unification`)
+
+### Removed
+
+- Dead `get_filtered_commands` from `CommandInput` and unused `filter_commands`
+  from the palette (replaced by `_apply_filter`). (`#tui-command-unification`)
+
 ## v0.1.6 — 2026-08-01
 
 ### Added

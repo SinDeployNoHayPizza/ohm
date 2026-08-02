@@ -28,25 +28,25 @@ Base chain: PR 1 base = feature/tui-command-unification; PR 2 base = PR 1 branch
 
 ## Slice 1: Catalog + Parity + Skills (R1/R2/R3)
 
-- [ ] 1.1 RED: `tests/test_command_catalog.py` — `palette_entries` empty, catalog-then-skills-sorted ordering, kinds, payload
-- [ ] 1.2 GREEN: `src/ohm/core/commands.py` — add `CommandKind`, `Command` fields (kind/action/payload/cli_equivalent), frozen `PaletteEntry`, pure `palette_entries(commands, skills=None)`; register 4 session commands (browser + list/continue/clear) as REAL
-- [ ] 1.3 RED: `tests/test_cli.py` — R1 parity: `register_all(Registry())` names biject with `CLI_TUI_MAPPING` keys; count equal; none omitted
-- [ ] 1.4 GREEN: `src/ohm/core/commands.py` — add `CLI_TUI_MAPPING` (15 subcommands + `--version`/`-h`)
-- [ ] 1.5 RED: R3 scenario — `/skill python`/`/skill debug` appended at N+1..N+2
-- [ ] 1.6 GREEN: `src/ohm/core/skills/loader.py` — hoist `DEFAULT_SKILL_SEARCH_PATHS`; `commands/skill.py` reuses; `OhmApp._skills` loaded once in `on_mount`
-- [ ] 1.7 GREEN: `src/ohm/cli/app.py` — wire `self.commands`, dropdown from `palette_entries` (R2 agree), `_dispatch_command` (DD-12), `action_skill_run` (FU-014)
-- [ ] 1.8 R9: delete `src/ohm/cli/keybindings.py`; strip `FAKE_COMMANDS`/`FAKE_HOTKEYS` from `utils/fake_data.py`; drop FAKE_COMMANDS import in app.py; grep-clean
+- [x] 1.1 RED: `tests/test_command_catalog.py` — `palette_entries` empty, catalog-then-skills-sorted ordering, kinds, payload
+- [x] 1.2 GREEN: `src/ohm/core/commands.py` — add `CommandKind`, `Command` fields (kind/action/payload/cli_equivalent), frozen `PaletteEntry`, pure `palette_entries(commands, skills=None)`; register 4 session commands (browser + list/continue/clear) as REAL
+- [x] 1.3 RED: `tests/test_cli.py` — R1 parity: `register_all(Registry())` names biject with `CLI_TUI_MAPPING` keys; count equal; none omitted
+- [x] 1.4 GREEN: `src/ohm/core/commands.py` — add `CLI_TUI_MAPPING` (15 subcommands + `--version`/`-h`)
+- [x] 1.5 RED: R3 scenario — `/skill python`/`/skill debug` appended at N+1..N+2
+- [x] 1.6 GREEN: `src/ohm/core/skills/loader.py` — hoist `DEFAULT_SKILL_SEARCH_PATHS`; `commands/skill.py` reuses; `OhmApp._skills` loaded once in `on_mount`
+- [x] 1.7 GREEN: `src/ohm/cli/app.py` — wire `self.commands`, dropdown from `palette_entries` (R2 agree), `_dispatch_command` (DD-12), `action_skill_run` (FU-014)
+- [x] 1.8 R9: delete `src/ohm/cli/keybindings.py`; strip `FAKE_COMMANDS`/`FAKE_HOTKEYS` from `utils/fake_data.py`; drop FAKE_COMMANDS import in app.py; grep-clean
 
 ## Slice 2: Widget Fixes (R4/R5/R6/R8)
 
-- [ ] 2.1 RED: `tests/cli/test_input.py` — headless: ctrl+j inserts `\n` without submit; ctrl+m submits as enter
-- [ ] 2.2 GREEN: `src/ohm/cli/widgets/input.py` `_on_key` — ctrl+m submit, ctrl+j `insert("\n")`; delete `get_filtered_commands`
-- [ ] 2.3 RED: `tests/cli/test_modal_menu.py` — `_apply_filter` narrows by name/description; resets index 0
-- [ ] 2.4 GREEN: `modal_menu.py` — `Input#palette-filter` + Static list; `Input.Changed → _apply_filter` (DD-10)
-- [ ] 2.5 RED: R6 — repeated F3 never pushes second modal; `_is_open` reads `screen_stack`
-- [ ] 2.6 GREEN: `app.py` — `_is_open(T)` guard: toggle modals pop on repeat, push modals no-op (DD-09)
-- [ ] 2.7 RED: `tests/cli/test_model_selector.py` — right adds provider to `_expanded`; left removes (R8)
-- [ ] 2.8 GREEN: `model_selector.py` — left/right bindings → collapse/expand (DD-11)
+- [x] 2.1 RED: `tests/cli/test_input.py` — headless: ctrl+j inserts `\n` without submit; ctrl+m submits as enter
+- [x] 2.2 GREEN: `src/ohm/cli/widgets/input.py` `_on_key` — ctrl+m submit, ctrl+j `insert("\n")`; delete `get_filtered_commands`
+- [x] 2.3 RED: `tests/cli/test_modal_menu.py` — `_apply_filter` narrows by name/description; resets index 0
+- [x] 2.4 GREEN: `modal_menu.py` — `Input#palette-filter` + Static list; `Input.Changed → _apply_filter` (DD-10)
+- [x] 2.5 RED: R6 — repeated F3 never pushes second modal; `_is_open` reads `screen_stack`
+- [x] 2.6 GREEN: `app.py` — `_is_open(T)` guard: toggle modals pop on repeat, push modals no-op (DD-09)
+- [x] 2.7 RED: `tests/cli/test_model_selector.py` — right adds provider to `_expanded`; left removes (R8)
+- [x] 2.8 GREEN: `model_selector.py` — left/right bindings → collapse/expand (DD-11)
 
 ## Slice 3: FU-015 ModalScreen Conversion (R7)
 

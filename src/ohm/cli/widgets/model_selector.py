@@ -40,6 +40,8 @@ class ModelSelector(Widget):
         Binding("pageup", "page_up", "Page Up", show=False),
         Binding("pagedown", "page_down", "Page Down", show=False),
         Binding("space", "toggle_expand", "Expand", show=False),
+        Binding("left", "collapse", "Collapse Branch", show=False),
+        Binding("right", "expand", "Expand Branch", show=False),
     ]
 
     selected_provider: reactive[int] = reactive(0)
@@ -228,6 +230,14 @@ class ModelSelector(Widget):
             self._expanded.discard(self.selected_provider)
         else:
             self._expanded.add(self.selected_provider)
+
+    def action_expand(self) -> None:
+        """Expand the selected provider's model branch (R8)."""
+        self._expanded.add(self.selected_provider)
+
+    def action_collapse(self) -> None:
+        """Collapse the selected provider's model branch (R8)."""
+        self._expanded.discard(self.selected_provider)
 
     def action_select(self) -> None:
         """Select the current model and close."""
