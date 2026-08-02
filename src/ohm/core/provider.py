@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from ohm.core.observability import get_metrics
+
 logger = logging.getLogger(__name__)
 
 # ── Retry constants ────────────────────────────────────────────
@@ -179,6 +181,7 @@ def retry(
                     status = _extract_status(exc)
                     if status is not None and _is_transient(status):
                         if attempt < max_retries - 1:
+                            _record_retry_attempt(status)
                             delay = min(base * (2 ** attempt), max_backoff)
                             # Add jitter: ±25%
                             jitter = random.uniform(0.75, 1.25)
@@ -202,6 +205,21 @@ def _extract_status(exc: Exception) -> int | None:
 def _is_transient(status: int) -> bool:
     """Return True if the status code is transient (retriable)."""
     return status == 429 or status == 503 or (500 <= status < 600)
+
+
+def _record_retry_attempt(status: int) -> None:
+    """Record a retry attempt and its transient status bucket (OBS-6).
+
+    Buckets: ``provider.transient.429``, ``provider.transient.503``,
+    ``provider.transient.5xx`` for any other 5xx status.
+    """
+    try:
+        bucket = "5xx" if 500 <= status < 600 else str(status)
+        reg = get_metrics()
+        reg.increment("ohm.metrics.provider.retry.attempts")
+        reg.increment(f"ohm.metrics.provider.transient.{bucket}")
+    except Exception:  # noqa: BLE001 — telemetry must never break calls
+        pass
 
 
 # ── Base Provider ABC ──────────────────────────────────────────
@@ -549,6 +567,10 @@ class FallbackProvider(Provider):
                 self._primary.config.name,
                 self._secondary.config.name,
             )
+            try:
+                get_metrics().increment("ohm.metrics.provider.failover")
+            except Exception:  # noqa: BLE001 — telemetry must never break calls
+                pass
             return self._secondary.complete(model, messages, **kwargs)
 
 

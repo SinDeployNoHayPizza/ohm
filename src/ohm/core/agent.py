@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from ohm.core.observability import get_metrics
+
 logger = logging.getLogger(__name__)
 
 # ── Provider → strands model class mapping ────────────────────
@@ -238,6 +240,8 @@ class Agent:
             self.state.current_task = None
             self.state.tasks_completed += 1
 
+            self._record_run_success(latency_ms, metrics)
+
             return AgentResponse(
                 content=content,
                 tokens_used=metrics.get("total_tokens", 0),
@@ -250,6 +254,7 @@ class Agent:
             self.state.is_running = False
             self.state.current_task = None
             self.state.tasks_failed += 1
+            self._record_run_failure()
             return AgentResponse(
                 content="",
                 latency_ms=latency_ms,
@@ -265,6 +270,7 @@ class Agent:
         agent = self._ensure_agent()
         self.state.is_running = True
         self.state.current_task = prompt
+        t0 = time.monotonic()
 
         try:
             async for event in agent.stream_async(prompt):
@@ -276,7 +282,9 @@ class Agent:
             try:
                 last_result = getattr(agent, '_last_result', None)
                 if last_result is not None:
-                    self.state.last_metrics = self._extract_metrics(last_result)
+                    metrics = self._extract_metrics(last_result)
+                    self.state.last_metrics = metrics
+                    self._record_run_success((time.monotonic() - t0) * 1000, metrics)
             except Exception:
                 self.state.last_metrics = {}
 
@@ -316,6 +324,32 @@ class Agent:
             }
         except Exception:
             return {}
+
+    def _record_run_success(self, latency_ms: float, metrics: dict[str, Any]) -> None:
+        """Record success counters, token/cycle usage and latency (OBS-5)."""
+        try:
+            reg = get_metrics()
+            reg.increment("ohm.metrics.runs.success")
+            reg.increment("ohm.metrics.tokens.total", int(metrics.get("total_tokens", 0)))
+            reg.increment("ohm.metrics.tokens.input", int(metrics.get("input_tokens", 0)))
+            reg.increment("ohm.metrics.tokens.output", int(metrics.get("output_tokens", 0)))
+            reg.increment("ohm.metrics.cycles.total", int(metrics.get("total_cycles", 0)))
+            tool_usage = metrics.get("tool_usage") or {}
+            calls = 0
+            for name, count in tool_usage.items():
+                calls += int(count)
+                reg.increment(f"ohm.metrics.tools.{name}", int(count))
+            reg.increment("ohm.metrics.tools.calls", calls)
+            reg.record_histogram("ohm.metrics.latency.ms", float(latency_ms))
+        except Exception:  # noqa: BLE001 — telemetry must never break the agent
+            pass
+
+    def _record_run_failure(self) -> None:
+        """Record the failure counter (OBS-5)."""
+        try:
+            get_metrics().increment("ohm.metrics.runs.failure")
+        except Exception:  # noqa: BLE001
+            pass
 
     @property
     def last_metrics(self) -> dict:

@@ -45,10 +45,10 @@ Chain strategy: size-exception
 
 ## Phase 3: S3 — Instrumentation (OBS-5, OBS-6)
 
-- [ ] 3.1 RED — `TestAgentMetrics`: success → runs.success, latency.ms, tokens.{total,input,output}, cycles.total, tools.calls; failure → runs.failure, no propagation; stream counters (OBS-5)
-- [ ] 3.2 RED — `TestProviderMetrics`: 429 succeeded on retry → retry.attempts + transient.429; failover → provider.failover (OBS-6)
-- [ ] 3.3 GREEN — `agent.py`: instrument `run()`/`stream()` boundaries via `get_metrics()`
-- [ ] 3.4 GREEN — `provider.py`: instrument `retry()` transient branch + `FallbackProvider.complete` except branch
+- [x] 3.1 RED — `TestAgentMetrics`: success → runs.success, latency.ms, tokens.{total,input,output}, cycles.total, tools.calls; failure → runs.failure, no propagation; stream counters (OBS-5)
+- [x] 3.2 RED — `TestProviderMetrics`: 429 succeeded on retry → retry.attempts + transient.429; failover → provider.failover (OBS-6)
+- [x] 3.3 GREEN — `agent.py`: instrument `run()`/`stream()` boundaries via `get_metrics()`
+- [x] 3.4 GREEN — `provider.py`: instrument `retry()` transient branch + `FallbackProvider.complete` except branch
 
 ## Phase 4: S4 — CLI Surfaces (OBS-9, OBS-3)
 

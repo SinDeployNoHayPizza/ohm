@@ -19,6 +19,7 @@ import pytest
 from ohm.core.agent import Agent, AgentConfig, AgentResponse
 from ohm.core.config import OHMConfig, _save_yaml, load_config
 from ohm.core.observability import JSONFormatter, get_metrics, setup_logging
+from ohm.core.provider import FallbackProvider, Provider, ProviderConfig, ProviderStatus, retry
 from ohm.commands.run import _handle_run
 
 
@@ -232,3 +233,160 @@ class TestMetricsRegistry:
         snap = m.snapshot()
         assert snap["counters"] == {}
         assert snap["histograms"] == {}
+
+
+class TestAgentMetrics:
+    """S3: OBS-5 — agent run/stream records telemetry without altering results."""
+
+    @staticmethod
+    def _fake_result(tokens: int, cycles: int, tool_usage: dict) -> object:
+        class FakeMetrics:
+            def get_summary(self):
+                return {
+                    "accumulated_usage": {
+                        "totalTokens": tokens,
+                        "inputTokens": tokens - 50,
+                        "outputTokens": 50,
+                    },
+                    "total_cycles": cycles,
+                    "total_duration": 1.5,
+                    "tool_usage": tool_usage,
+                }
+
+        class FakeMsg:
+            content = [{"text": "ok"}]
+
+        class FakeResult:
+            message = FakeMsg()
+            metrics = FakeMetrics()
+
+        return FakeResult()
+
+    async def test_successful_run_records_metrics(self):
+        """OBS-5: success, latency, tokens, cycles, tool usage all recorded."""
+        agent = Agent(AgentConfig())
+        agent._ensure_agent = lambda: (
+            lambda prompt: self._fake_result(150, 2, {"file_read": 1, "editor": 2})
+        )
+        resp = await agent.run("hello")
+        assert resp.success is True
+        snap = get_metrics().snapshot()
+        assert snap["counters"]["ohm.metrics.runs.success"] == 1
+        assert snap["counters"]["ohm.metrics.tokens.total"] == 150
+        assert snap["counters"]["ohm.metrics.tokens.input"] == 100
+        assert snap["counters"]["ohm.metrics.tokens.output"] == 50
+        assert snap["counters"]["ohm.metrics.cycles.total"] == 2
+        assert snap["counters"]["ohm.metrics.tools.calls"] == 3
+        assert snap["counters"]["ohm.metrics.tools.file_read"] == 1
+        assert snap["counters"]["ohm.metrics.tools.editor"] == 2
+        assert snap["histograms"]["ohm.metrics.latency.ms"]["count"] == 1
+
+    async def test_failed_run_records_failure_no_propagation(self):
+        """OBS-5: failure counter increments; instrumentation never raises."""
+
+        def boom(prompt):
+            raise RuntimeError("api down")
+
+        agent = Agent(AgentConfig())
+        agent._ensure_agent = lambda: boom
+        resp = await agent.run("hello")
+        assert resp.success is False
+        assert resp.error is not None
+        snap = get_metrics().snapshot()
+        assert snap["counters"]["ohm.metrics.runs.failure"] == 1
+        assert "ohm.metrics.runs.success" not in snap["counters"]
+
+    async def test_stream_records_success_metrics(self):
+        """OBS-5: stream completion records success counters too."""
+
+        class FakeStrandsAgent:
+            async def stream_async(self, prompt):
+                yield {"type": "text", "data": "hi"}
+
+            _last_result = TestAgentMetrics._fake_result(200, 1, {})
+
+        agent = Agent(AgentConfig())
+        agent._ensure_agent = lambda: FakeStrandsAgent()
+        events = []
+        async for event in agent.stream("hello"):
+            events.append(event)
+        snap = get_metrics().snapshot()
+        assert snap["counters"]["ohm.metrics.runs.success"] == 1
+        assert snap["counters"]["ohm.metrics.tokens.total"] == 200
+
+
+class TestProviderMetrics:
+    """S3: OBS-6 — retry attempts, transient statuses, failover events."""
+
+    def test_429_retry_records_attempts_and_transient(self):
+        """OBS-6: a 429 that succeeds on retry records attempts + transient.429."""
+
+        class _Harness:
+            def __init__(self, codes):
+                self.codes = codes
+                self.call_count = 0
+
+            def __call__(self):
+                idx = self.call_count
+                self.call_count += 1
+                status = self.codes[idx]
+                if status >= 400:
+                    exc = RuntimeError(f"HTTP {status}")
+                    setattr(exc, "status_code", status)
+                    raise exc
+                return status
+
+        harness = _Harness([429, 200])
+
+        @retry(max_retries=2, base=0.001)
+        def call() -> int:
+            return harness()
+
+        assert call() == 200
+        snap = get_metrics().snapshot()
+        assert snap["counters"]["ohm.metrics.provider.retry.attempts"] == 1
+        assert snap["counters"]["ohm.metrics.provider.transient.429"] == 1
+
+    def test_failover_records_failover_counter(self):
+        """OBS-6: FallbackProvider failover to secondary increments the counter."""
+
+        class FailingProvider(Provider):
+            def create_model(self):
+                return None
+
+            def get_models(self):
+                return []
+
+            def check_health(self):
+                return ProviderStatus.UNHEALTHY
+
+            def get_status(self):
+                return {"name": "fail"}
+
+            def complete(self, model: str, messages: list, **kwargs):
+                raise RuntimeError("HTTP 429")
+
+        class WorkingProvider(Provider):
+            def create_model(self):
+                return None
+
+            def get_models(self):
+                return []
+
+            def check_health(self):
+                return ProviderStatus.HEALTHY
+
+            def get_status(self):
+                return {"name": "work"}
+
+            def complete(self, model: str, messages: list, **kwargs):
+                return {"content": "from secondary", "model": model}
+
+        primary = FailingProvider(ProviderConfig(name="primary", display_name="Primary"))
+        secondary = WorkingProvider(ProviderConfig(name="secondary", display_name="Secondary"))
+        fallback = FallbackProvider(primary, secondary)
+
+        result = fallback.complete("test-model", [])
+        assert result["content"] == "from secondary"
+        snap = get_metrics().snapshot()
+        assert snap["counters"]["ohm.metrics.provider.failover"] == 1
