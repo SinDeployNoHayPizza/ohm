@@ -27,7 +27,7 @@ build_output_hash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca49599
 | Tasks complete | 20 |
 | Tasks incomplete | 0 |
 
-All tasks checked `[x]` in `openspec/changes/tui-command-unification/tasks.md`. No pending task — full verification ran. Working tree clean; HEAD `44afc39` on master (remediation commit that follows adds the R2 surface-agreement evidence and re-verifies).
+All tasks checked `[x]` in `openspec/changes/tui-command-unification/tasks.md`. No pending task — full verification ran. Working tree clean; HEAD `3188b28` on master (remediation commit applied: R2 surface-agreement evidence added and re-verified).
 
 ### Build & Tests Execution
 
@@ -101,7 +101,7 @@ Spec: `openspec/changes/tui-command-unification/specs/tui-commands/spec.md` — 
 | TDD Evidence reported | ⚠️ | Work-unit evidence in apply-progress (Engram #232: focused tests, runtime harness, safety-net counts) + per-task RED/GREEN labels in tasks.md; canonical "TDD Cycle Evidence" table (RED/GREEN/TRIANGULATE/SAFETY NET/REFACTOR) not persisted verbatim |
 | All tasks have tests | ✅ | 20/20 tasks map to test files that exist |
 | RED confirmed (tests exist) | ✅ | 5/5 test files verified: `test_command_catalog.py`, `test_cli.py`, `cli/test_input.py`, `cli/test_modal_menu.py`, `cli/test_model_selector.py` |
-| GREEN confirmed (tests pass) | ✅ | 204/204 pass on execution (JUnit XML: errors=0 failures=0 skipped=0) |
+| GREEN confirmed (tests pass) | ✅ | 205/205 pass on execution (JUnit XML: errors=0 failures=0 skipped=0) |
 | Triangulation adequate | ✅ | R4: 3 cases, R5: 8, R6: 5, R8: 7, R1: 6, R2/R3: 9 builder cases — multi-case per behavior |
 | Safety Net for modified files | ✅ | apply-progress: 198 passed before slice 3 → 204 after (3 full runs green); focused tests green before each commit |
 
