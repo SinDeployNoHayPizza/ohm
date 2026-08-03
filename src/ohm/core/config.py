@@ -50,6 +50,7 @@ DEFAULTS: dict[str, Any] = {
         "http_request", "think",
     ],
     "mcp": {},
+    "mcp_server": {"transport": "stdio", "host": "127.0.0.1", "port": 3000},
     "log_format": "text",
     "metrics_enabled": True,
 }
@@ -147,6 +148,9 @@ class OHMConfig:
         "http_request", "think",
     ])
     mcp: dict[str, Any] = field(default_factory=dict)
+    mcp_server: dict[str, Any] = field(
+        default_factory=lambda: dict(DEFAULTS["mcp_server"])
+    )
     log_level: str = "INFO"
     log_format: str = "text"
     metrics_enabled: bool = True
@@ -199,6 +203,7 @@ class OHMConfig:
             "system_prompt": self.system_prompt,
             "tools": self.tools,
             "mcp": self.mcp,
+            "mcp_server": self.mcp_server,
             "log_level": self.log_level,
             "log_format": self.log_format,
             "metrics_enabled": self.metrics_enabled,
@@ -265,6 +270,15 @@ def load_config(
         log_format = "text"
     merged["log_format"] = log_format
 
+    # Merge mcp_server over the FULL defaults (CF1): a partial config like
+    # `mcp_server: {port: 3000}` keeps the default transport/host.
+    mcp_server = dict(DEFAULTS["mcp_server"])
+    configured_mcp_server = merged.get("mcp_server") or {}
+    if isinstance(configured_mcp_server, dict):
+        mcp_server.update(
+            {k: v for k, v in configured_mcp_server.items() if v is not None}
+        )
+
     return OHMConfig(
         provider=merged["provider"],
         model=merged["model"],
@@ -275,6 +289,7 @@ def load_config(
         system_prompt=merged.get("system_prompt"),
         tools=merged["tools"],
         mcp=merged.get("mcp", {}),
+        mcp_server=mcp_server,
         log_level=merged.get("log_level", "INFO"),
         log_format=log_format,
         metrics_enabled=merged.get("metrics_enabled", True),
