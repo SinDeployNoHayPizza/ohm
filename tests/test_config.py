@@ -1,5 +1,6 @@
 """Tests for OHM configuration system."""
 
+import argparse
 import os
 import tempfile
 from pathlib import Path
@@ -279,3 +280,71 @@ class TestResolveProvider:
         os.environ.pop("ANTHROPIC_API_KEY", None)
         cfg = load_config(dotenv_path=env_file)
         assert cfg.api_key_for("anthropic") == "sk-test-env"
+
+
+class TestMcpServerConfig:
+    """MCP-11: the server-side ``mcp_server:`` section, distinct from ``mcp:``."""
+
+    _DEFAULTS = {"transport": "stdio", "host": "127.0.0.1", "port": 3000}
+
+    def test_mcp_server_defaults_full_dict(self):
+        """CF1: DEFAULTS holds the FULL mcp_server dict (not an empty mirror)."""
+        assert DEFAULTS["mcp_server"] == self._DEFAULTS
+
+    def test_ohmconfig_mcp_server_defaults(self):
+        cfg = OHMConfig()
+        assert cfg.mcp_server == self._DEFAULTS
+
+    def test_mcp_server_distinct_from_client_mcp(self):
+        cfg = OHMConfig()
+        assert cfg.mcp == {}
+        assert cfg.mcp_server == self._DEFAULTS
+
+    def test_to_dict_roundtrip_mcp_server(self, tmp_path):
+        cfg = OHMConfig(
+            mcp_server={"transport": "http", "host": "0.0.0.0", "port": 5000}
+        )
+        d = cfg.to_dict()
+        assert d["mcp_server"] == {"transport": "http", "host": "0.0.0.0", "port": 5000}
+        config_file = tmp_path / "config.yaml"
+        _save_yaml(config_file, d)
+        loaded = _load_yaml(config_file)
+        assert loaded["mcp_server"] == {
+            "transport": "http",
+            "host": "0.0.0.0",
+            "port": 5000,
+        }
+
+    def test_load_config_merges_partial_mcp_server(self, tmp_path):
+        """CF1: partial mcp_server keys merge over the full defaults."""
+        project_file = tmp_path / "project.yaml"
+        _save_yaml(project_file, {"mcp_server": {"transport": "http", "port": 5000}})
+        cfg = load_config(
+            global_path=tmp_path / "nonexistent" / "global.yaml",
+            project_path=project_file,
+            dotenv_path=tmp_path / "nonexistent" / ".env",
+        )
+        assert cfg.mcp_server["transport"] == "http"
+        assert cfg.mcp_server["port"] == 5000
+        assert cfg.mcp_server["host"] == "127.0.0.1"
+
+    def test_load_config_no_mcp_server_uses_defaults(self, tmp_path):
+        """CF1: no mcp_server: key -> full defaults merged."""
+        cfg = load_config(
+            global_path=tmp_path / "nonexistent" / "global.yaml",
+            project_path=tmp_path / "nonexistent" / "project.yaml",
+            dotenv_path=tmp_path / "nonexistent" / ".env",
+        )
+        assert cfg.mcp_server == self._DEFAULTS
+
+    def test_resolve_server_args_falls_back_to_defaults(self):
+        """CF1: empty CLI namespace + default config -> stdio/127.0.0.1/3000."""
+        from ohm.core.mcp_server import _resolve_server_args
+
+        cfg = OHMConfig()
+        resolved = _resolve_server_args(argparse.Namespace(), cfg)
+        assert resolved == {
+            "transport": "stdio",
+            "host": "127.0.0.1",
+            "port": 3000,
+        }

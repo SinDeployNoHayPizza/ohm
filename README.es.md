@@ -249,12 +249,33 @@ OHM implementa protocolos estándar de la industria para interoperabilidad:
 La interfaz estándar para exponer herramientas y recursos a LLMs.
 
 ```bash
-# OHM se ejecuta como servidor MCP
-ohm serve --protocol mcp --port 3000
+# OHM se ejecuta como servidor MCP (transporte stdio por defecto)
+ohm mcp serve
+
+# O sobre HTTP en un puerto explícito
+ohm mcp serve --transport http --port 3000
 ```
 
 - [Especificación MCP](https://modelcontextprotocol.io/docs/getting-started/intro)
 - Registro de herramientas, descubrimiento de recursos y gestión de prompts
+
+#### Conectar un cliente
+
+Prueba el servidor desde cualquier cliente MCP — este ejemplo usa el MCP Inspector:
+
+1. Inicia el servidor (el endpoint MCP se expone en `http://127.0.0.1:3000/mcp`):
+
+   ```bash
+   uv run ohm mcp serve --transport http --host 127.0.0.1 --port 3000
+   ```
+
+2. Abre el MCP Inspector:
+
+   ```bash
+   npx @modelcontextprotocol/inspector
+   ```
+
+3. Añade OHM como servidor MCP con la URL `http://127.0.0.1:3000/mcp` y el transporte **Streamable HTTP**, y luego llama a las herramientas (`run_prompt`, `get_status`, `list_skills`, entre otras).
 
 ### ACP — Agent Client Protocol
 
@@ -560,7 +581,7 @@ interface:
 - [ ] Administrador de sandbox (gVisor / Docker)
 - [ ] Registro y cargador de skills (en progreso)
 - [x] Registro estructurado y métricas
-- [ ] Implementación del servidor MCP
+- [x] Implementación del servidor MCP
 
 ### Fase 3 — Interoperabilidad
 - [ ] Adaptador de transporte ACP
