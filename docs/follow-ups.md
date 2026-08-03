@@ -20,6 +20,8 @@ Source of truth for archived-change follow-ups: `openspec/changes/archive/<date>
 | FU-008 | skills-registry-loader | SUGGESTION | `src/ohm/commands/skill.py:59-60` unknown-action branch untested. | Add CLI test for unknown subcommand. |
 | FU-017 | structured-logging-metrics | SUGGESTION | `src/ohm/commands/run.py:48` echoes `[run] prompt: {args.prompt}` to stderr — prompt content visible on stderr under DEBUG sessions. Pre-existing UI print (not a log record; stdout purity unaffected; OBS-8 governs log records only). | Redact the prompt echo (log length/metadata only) in a future change. |
 | FU-018 | structured-logging-metrics | SUGGESTION | `ohm.metrics.cost.usd` is a fixed `0.0` slot — no cost data source in Stage 1 (OBS-7, D6). | Compute real cost from `PROVIDER_CATALOG` once pricing data exists (Stage 2). |
+| FU-019 | mcp-server | SUGGESTION | 7 pre-existing ruff F541 errors in the `src/ohm/commands/serve.py` placeholder block (lines 76, 78–83) remain unfixed — verified identical on pristine `b6e7155`; 0 introduced by this change. Ruff is not a configured gate. | Dedicated cleanup task: drop the f-string placeholders or use plain string literals. |
+| FU-020 | mcp-server | SUGGESTION | `ohm mcp serve --help` shows only one-level mcp help — the new `serve` subcommand's options are not listed (pre-existing Registry `_print_subcommand_help` design; `ohm mcp` no-args usage line does include `serve`). | Redesign Registry help to recurse into subcommands, or surface `serve` options at the mcp help level. |
 
 ## Resolved
 
