@@ -33,6 +33,25 @@ def add_arguments(parser: argparse._ActionsContainer) -> None:
     connect_p = sub.add_parser("connect", help="Connect to server")
     connect_p.add_argument("name", help="Server name")
 
+    serve_p = sub.add_parser("serve", help="Start the OHM MCP server")
+    serve_p.add_argument(
+        "--transport",
+        choices=("stdio", "http"),
+        default=None,
+        help="Transport (default: config or stdio)",
+    )
+    serve_p.add_argument(
+        "--host",
+        default=None,
+        help="Bind host (default: config or 127.0.0.1)",
+    )
+    serve_p.add_argument(
+        "--port", "-p",
+        type=int,
+        default=None,
+        help="Bind port (default: config or 3000)",
+    )
+
 
 def execute(args: argparse.Namespace) -> int:
     cmd = getattr(args, "mcp_command", None)
@@ -69,5 +88,20 @@ def execute(args: argparse.Namespace) -> int:
         print(f"[mcp] => Connection to '{args.name}' would be established.")
         return 0
 
-    print("[mcp] Usage: ohm mcp {list|add|remove|status|connect}")
+    if cmd == "serve":
+        # Start the OHM MCP server. Resolution order (MCP-11):
+        # CLI flags > config mcp_server section > built-in defaults.
+        # CF2: run_stdio/run_http block on the event loop — no asyncio.run().
+        from ohm.core.config import get_config
+        from ohm.core.mcp_server import _resolve_server_args, run_http, run_stdio
+
+        cfg = get_config()
+        resolved = _resolve_server_args(args, cfg)
+        if resolved["transport"] == "http":
+            run_http(resolved["host"], resolved["port"])
+        else:
+            run_stdio()
+        return 0
+
+    print("[mcp] Usage: ohm mcp {list|add|remove|status|connect|serve}")
     return 2

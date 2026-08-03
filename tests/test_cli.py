@@ -418,3 +418,164 @@ class TestCliTuiParity:
             "doctor", "mcp", "cron", "init", "serve", "plugin",
             "--version", "-h",
         }
+
+
+class TestMcpServe:
+    """MCP-8/9: `ohm mcp serve` sub-subcommand parsing and dispatch."""
+
+    @staticmethod
+    def _register_mcp() -> Registry:
+        from ohm.commands.mcp import register
+
+        reg = Registry()
+        register(reg)
+        return reg
+
+    def test_mcp_serve_parses_transport_host_port(self):
+        """MCP-9: explicit --transport/--host/--port land on the namespace."""
+        reg = self._register_mcp()
+        ns = reg.parse(
+            ["mcp", "serve", "--transport", "http", "--port", "3000"]
+        ).namespace
+        assert ns.subcommand == "mcp"
+        assert ns.mcp_command == "serve"
+        assert ns.transport == "http"
+        assert ns.port == 3000
+
+    def test_mcp_serve_flags_default_to_none(self):
+        """Flags omitted -> None so config/default resolution can apply."""
+        reg = self._register_mcp()
+        ns = reg.parse(["mcp", "serve"]).namespace
+        assert ns.mcp_command == "serve"
+        assert ns.transport is None
+        assert ns.host is None
+        assert ns.port is None
+
+    def test_mcp_serve_http_dispatches_run_http(self, monkeypatch):
+        """CF4: dispatch calls run_http — no socket binding in tests."""
+        from ohm.commands.mcp import execute
+        from ohm.core import mcp_server as core_mod
+
+        called: dict = {}
+        monkeypatch.setattr(
+            core_mod,
+            "run_http",
+            lambda host, port, agent_factory=None: called.update(
+                http=(host, port)
+            ),
+        )
+        monkeypatch.setattr(
+            core_mod,
+            "run_stdio",
+            lambda agent_factory=None: called.update(stdio=True),
+        )
+        ns = argparse.Namespace(
+            mcp_command="serve", transport="http", host="0.0.0.0", port=4000
+        )
+        code = execute(ns)
+        assert code == 0
+        assert called == {"http": ("0.0.0.0", 4000)}
+
+    def test_mcp_serve_stdio_dispatches_run_stdio(self, monkeypatch):
+        """MCP-8: default/stdio transport routes to run_stdio."""
+        from ohm.commands.mcp import execute
+        from ohm.core import mcp_server as core_mod
+
+        called: dict = {}
+        monkeypatch.setattr(
+            core_mod,
+            "run_http",
+            lambda host, port, agent_factory=None: called.update(http=True),
+        )
+        monkeypatch.setattr(
+            core_mod,
+            "run_stdio",
+            lambda agent_factory=None: called.update(stdio=True),
+        )
+        ns = argparse.Namespace(
+            mcp_command="serve", transport="stdio", host="127.0.0.1", port=3000
+        )
+        code = execute(ns)
+        assert code == 0
+        assert called == {"stdio": True}
+
+
+class TestServeProtocol:
+    """MCP-10: `ohm serve --protocol mcp` alias; default stays http."""
+
+    @staticmethod
+    def _register_serve() -> Registry:
+        from ohm.commands.serve import register
+
+        reg = Registry()
+        register(reg)
+        return reg
+
+    def test_serve_default_protocol_is_http(self):
+        reg = self._register_serve()
+        ns = reg.parse(["serve"]).namespace
+        assert ns.protocol == "http"
+        assert ns.port is None
+
+    def test_serve_protocol_mcp_parses(self):
+        reg = self._register_serve()
+        ns = reg.parse(["serve", "--protocol", "mcp", "--port", "3000"]).namespace
+        assert ns.protocol == "mcp"
+        assert ns.port == 3000
+
+    def test_serve_protocol_mcp_dispatches_run_http(self, monkeypatch):
+        """CF4: the mcp branch dispatches to run_http with host/port."""
+        from ohm.commands.serve import execute
+        from ohm.core import mcp_server as core_mod
+
+        called: dict = {}
+        monkeypatch.setattr(
+            core_mod,
+            "run_http",
+            lambda host, port, agent_factory=None: called.update(
+                http=(host, port)
+            ),
+        )
+        ns = argparse.Namespace(
+            protocol="mcp", host="127.0.0.1", port=3000, workers=1, reload=False
+        )
+        code = execute(ns)
+        assert code == 0
+        assert called == {"http": ("127.0.0.1", 3000)}
+
+    def test_serve_http_branch_keeps_placeholder_and_port_8080(self, capsys):
+        """D6: without --protocol mcp, today's placeholder output is kept."""
+        from ohm.commands.serve import execute
+
+        ns = argparse.Namespace(
+            protocol="http", host="127.0.0.1", port=None, workers=1, reload=False
+        )
+        code = execute(ns)
+        out = capsys.readouterr().out
+        assert code == 0
+        assert "http://127.0.0.1:8080" in out
+
+
+class TestResolveServerArgs:
+    """MCP-11: _resolve_server_args precedence CLI > config > defaults."""
+
+    def test_cli_overrides_config(self):
+        from ohm.core.config import OHMConfig
+        from ohm.core.mcp_server import _resolve_server_args
+
+        cfg = OHMConfig(
+            mcp_server={"transport": "http", "host": "0.0.0.0", "port": 3000}
+        )
+        ns = argparse.Namespace(transport=None, host=None, port=4000)
+        resolved = _resolve_server_args(ns, cfg)
+        assert resolved == {"transport": "http", "host": "0.0.0.0", "port": 4000}
+
+    def test_config_overrides_defaults(self):
+        from ohm.core.config import OHMConfig
+        from ohm.core.mcp_server import _resolve_server_args
+
+        cfg = OHMConfig(
+            mcp_server={"transport": "http", "host": "0.0.0.0", "port": 5000}
+        )
+        resolved = _resolve_server_args(argparse.Namespace(), cfg)
+        assert resolved == {"transport": "http", "host": "0.0.0.0", "port": 5000}
