@@ -257,6 +257,24 @@ ohm mcp serve --transport http --port 3000
 - [MCP Specification](https://modelcontextprotocol.io/docs/getting-started/intro)
 - Tool registration, resource discovery, and prompt management
 
+#### Connect a client
+
+Try the server from any MCP client — this example uses the MCP Inspector:
+
+1. Start the server (the MCP endpoint is exposed at `http://127.0.0.1:3000/mcp`):
+
+   ```bash
+   uv run ohm mcp serve --transport http --host 127.0.0.1 --port 3000
+   ```
+
+2. Open the MCP Inspector:
+
+   ```bash
+   npx @modelcontextprotocol/inspector
+   ```
+
+3. Add OHM as an MCP server with URL `http://127.0.0.1:3000/mcp` using the **Streamable HTTP** transport, then call the exposed tools (`run_prompt`, `get_status`, `list_skills`, and more).
+
 ### ACP — Agent Client Protocol
 
 Agent-to-client communication for multi-agent systems.
