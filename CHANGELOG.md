@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.1.11 — 2026-08-02
+
+### Added
+
+- **MCP server core**: `src/ohm/core/mcp_server.py` provides
+  `build_mcp_server()` — a FastMCP server with seven stateless tools
+  (`run_prompt`, `run_goal`, `get_status`, `list_sessions`, `get_session`,
+  `list_skills`, `list_models`) — plus `run_stdio()` / `run_http()` entry
+  points and `_resolve_server_args()` for CLI > config > defaults resolution.
+  (`#mcp-server`)
+- **`ohm mcp serve`**: new sub-subcommand that starts the OHM MCP server with
+  `--transport stdio|http`, `--host` and `--port`; `ohm serve --protocol mcp`
+  aliases the HTTP transport. (`#mcp-server`)
+- **`mcp_server` config section**: `DEFAULTS["mcp_server"]` adds
+  `{transport: stdio, host: 127.0.0.1, port: 3000}`, distinct from the
+  client-side `mcp:` key; a partial section merges over the full defaults.
+  (`#mcp-server`)
+
+### Changed
+
+- **`ohm serve` port default**: `--port` now defaults to `None` — the http
+  branch still resolves 8080 as before, and the mcp branch resolves the
+  config/default port 3000. (`#mcp-server`)
+
 ## v0.1.10 — 2026-08-02
 
 ### Added

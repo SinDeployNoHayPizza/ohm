@@ -232,6 +232,29 @@ mcp:
     args: ["-m", "my_mcp_server"]
 ```
 
+### OHM as an MCP Server
+
+To run OHM itself as an MCP server, use the `mcp_server` section — distinct
+from the client-side `mcp:` key above:
+
+```yaml
+mcp_server:
+  transport: stdio   # or http
+  host: 127.0.0.1    # used by the http transport
+  port: 3000         # used by the http transport
+```
+
+Start the server with:
+
+```bash
+ohm mcp serve                        # stdio transport (default)
+ohm mcp serve --transport http --port 3000
+ohm serve --protocol mcp --port 3000 # alias
+```
+
+Any omitted keys fall back to the defaults (`stdio`, `127.0.0.1`, `3000`),
+and explicit CLI flags always win over the config.
+
 ## Troubleshooting
 
 **Config not loading?**

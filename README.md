@@ -247,8 +247,11 @@ OHM implements industry-standard protocols for interoperability:
 The standard interface for exposing tools and resources to LLMs.
 
 ```bash
-# OHM runs as an MCP server
-ohm serve --protocol mcp --port 3000
+# OHM runs as an MCP server (stdio transport by default)
+ohm mcp serve
+
+# Or over HTTP on an explicit port
+ohm mcp serve --transport http --port 3000
 ```
 
 - [MCP Specification](https://modelcontextprotocol.io/docs/getting-started/intro)
@@ -557,7 +560,7 @@ interface:
 - [ ] Sandbox manager (gVisor / Docker)
 - [x] Skills registry and loader
 - [x] Structured logging and metrics
-- [ ] MCP server implementation
+- [x] MCP server implementation
 
 ### Phase 3 — Interoperability
 - [ ] ACP transport adapter
